@@ -21,7 +21,7 @@
 - Visual invalid state (`NgControl`)
 - Reusable validators included
 - Configurable visual inputs
-- **Zero external dependencies** (only Angular core)
+- **No third-party dependencies** — only Angular packages required
 
 ## Requirements
 
@@ -166,8 +166,12 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 
 ## Roadmap
 
-- Theme inputs (colors / icons)
-- Automatic HTTP upload
+- Image compression (`maxWidth`, `maxHeight`, `quality`)
+- EXIF orientation correction
+- Cropping support
+- Image reordering
+- Paste from clipboard (Ctrl + V)
+- Theme customization
 - i18n
 
 ## License
