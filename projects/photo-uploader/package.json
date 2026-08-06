@@ -1,0 +1,22 @@
+{
+  "name": "ngx-photo-uploader",
+  "version": "1.0.1",
+  "description": "Angular standalone photo uploader with preview, drag & drop, camera capture and Reactive Forms support",
+  "keywords": [
+    "angular",
+    "photo",
+    "uploader",
+    "preview",
+    "drag-and-drop",
+    "camera",
+    "forms"
+  ],
+  "peerDependencies": {
+    "@angular/common": "^17.3.0",
+    "@angular/core": "^17.3.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false
+}

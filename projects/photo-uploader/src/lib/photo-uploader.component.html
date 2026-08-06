@@ -1,0 +1,106 @@
+<div class="photo-uploader">
+  <div
+    class="upload-container"
+    [class.dragging]="isDragging"
+    [class.disabled]="isDisabled"
+    [class.invalid]="ngControl?.invalid && ngControl?.touched"
+    [style.height]="height"
+    [style.borderRadius.px]="rounded"
+    (click)="!isDisabled && fileInput.click()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    <input
+      #fileInput
+      type="file"
+      [accept]="accept"
+      [multiple]="multiple"
+      (change)="onFilesSelected($event)"
+      hidden
+    />
+
+    @if (!thumbnails.length) {
+      <svg
+        class="upload-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          d="M21.025 5h-3.6L15.6 3.25c-.4-.325-.9-.5-1.4-.5H9.8c-.5 0-1 .175-1.4.5L6.575 5h-3.6C1.875 5 1 5.875 1 7v11.5c0 1.125.875 2 2 2h18c1.125 0 2-.875 2-2V7c0-1.125-.875-2-2-2ZM12 18.1c-2.6 0-4.7-2.1-4.7-4.7s2.1-4.7 4.7-4.7 4.7 2.1 4.7 4.7-2.1 4.7-4.7 4.7Z"
+        />
+      </svg>
+      <div class="upload-placeholder">
+        <p>{{ placeholder }}</p>
+      </div>
+    }
+  </div>
+
+  @if (thumbnails.length) {
+    <div class="thumbnails" [style.gap.px]="gap">
+      @for (thumbnail of thumbnails; track $index) {
+        <div
+          class="thumbnail"
+          [style.width.px]="thumbnailSize"
+          [style.height.px]="thumbnailSize"
+        >
+          <img [src]="thumbnail" [alt]="'Preview ' + ($index + 1)" />
+          <button
+            type="button"
+            class="remove"
+            [disabled]="isDisabled"
+            [attr.aria-label]="'Eliminar foto ' + ($index + 1)"
+            (click)="removePhoto($index)"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12ZM8 9h8v10H8V9Zm7.5-5-1-1h-5l-1 1H5v2h14V4h-3.5Z"
+              />
+            </svg>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="actions">
+    @if (thumbnails.length) {
+      <button type="button" class="clear" [disabled]="isDisabled" (click)="clearPhotos()">
+        Limpiar todas las fotos
+      </button>
+    }
+
+    @if (!isCameraOpen) {
+      <button type="button" class="camera-toggle" [disabled]="isDisabled" (click)="openCamera()">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4ZM14 13h-3v3H9v-3H6v-2h3V8h2v3h3v2Z"
+          />
+        </svg>
+        Usar cámara
+      </button>
+    }
+  </div>
+
+  @if (isCameraOpen) {
+    <div class="camera">
+      <video #video autoplay playsinline></video>
+      <div class="camera-actions">
+        <button type="button" class="capture" (click)="takePhoto()">Capturar</button>
+        <button type="button" class="cancel" (click)="closeCamera()">Cancelar</button>
+      </div>
+    </div>
+  }
+</div>

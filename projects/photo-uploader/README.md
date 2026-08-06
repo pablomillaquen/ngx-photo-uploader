@@ -1,13 +1,6 @@
 # Photo Uploader — Angular
 
-[![npm version](https://img.shields.io/npm/v/ngx-photo-uploader.svg)](https://www.npmjs.com/package/ngx-photo-uploader)
-[![npm downloads](https://img.shields.io/npm/dm/ngx-photo-uploader.svg)](https://www.npmjs.com/package/ngx-photo-uploader)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
 **Standalone** Angular component for uploading images via **click, drag & drop, or camera**, with built-in preview and full **Reactive Forms** support.
-
-- Available on [npm](https://www.npmjs.com/package/ngx-photo-uploader)
-- Source code lives in [`projects/photo-uploader`](projects/photo-uploader)
 
 ## Features
 
@@ -155,14 +148,6 @@ this.form = this.fb.group({
 - Automatic disabled state with Forms
 - Visual invalid state (red border) via `NgControl`
 - Aria-labels on action buttons
-
-## Development
-
-```bash
-npm install
-npm run build   # builds the library into dist/
-npm test        # runs the unit tests (requires Chrome/Chromium)
-```
 
 ## Roadmap
 
