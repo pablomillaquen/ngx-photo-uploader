@@ -12,6 +12,24 @@ describe('PhotoUploaderComponent', () => {
   const imageFile = (name: string, size = 10) =>
     new File([new Uint8Array(size)], name, { type: 'image/png' });
 
+  const makeImageFile = (w: number, h: number, type = 'image/png', name = 'photo.png') =>
+    new Promise<File>((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.toBlob((blob) => resolve(new File([blob!], name, { type })), type, 1);
+    });
+
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const imageDims = (url: string) =>
+    new Promise<{ width: number; height: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve({ width: 0, height: 0 });
+      img.src = url;
+    });
+
   const selectionEvent = (files: File[]) =>
     ({ target: { files } }) as unknown as Event;
 
@@ -150,5 +168,109 @@ describe('PhotoUploaderComponent', () => {
       expect(onChangeSpy).toHaveBeenCalled();
       done();
     }, 300);
+  });
+
+  describe('image compression', () => {
+    it('compresses images larger than maxWidth', async () => {
+      component.maxWidth = 100;
+      const big = await makeImageFile(800, 600);
+      component.onFilesSelected(selectionEvent([big]));
+      await wait(300);
+
+      expect(component.selectedPhotos.length).toBe(1);
+      const url = URL.createObjectURL(component.selectedPhotos[0]);
+      const dims = await imageDims(url);
+      URL.revokeObjectURL(url);
+      expect(dims.width).toBeLessThanOrEqual(100);
+      expect(dims.height).toBeLessThanOrEqual(75);
+      expect(onChangeSpy).toHaveBeenCalled();
+    });
+
+    it('scales by maxHeight keeping the aspect ratio', async () => {
+      component.maxHeight = 50;
+      const wide = await makeImageFile(400, 200);
+      component.onFilesSelected(selectionEvent([wide]));
+      await wait(300);
+
+      expect(component.selectedPhotos.length).toBe(1);
+      const url = URL.createObjectURL(component.selectedPhotos[0]);
+      const dims = await imageDims(url);
+      URL.revokeObjectURL(url);
+      expect(dims.width).toBe(100);
+      expect(dims.height).toBe(50);
+    });
+
+    it('keeps the original file when already within limits', async () => {
+      component.maxWidth = 500;
+      const small = await makeImageFile(100, 80);
+      component.onFilesSelected(selectionEvent([small]));
+      await wait(300);
+
+      expect(component.selectedPhotos.length).toBe(1);
+      expect(component.selectedPhotos[0].size).toBe(small.size);
+    });
+
+    it('skips non-raster image types', async () => {
+      component.maxWidth = 50;
+      const gif = new File(['GIF89a'], 'a.gif', { type: 'image/gif' });
+      component.onFilesSelected(selectionEvent([gif]));
+      await wait(50);
+
+      expect(component.selectedPhotos.length).toBe(1);
+      expect(component.selectedPhotos[0]).toBe(gif);
+    });
+  });
+
+  describe('paste from clipboard', () => {
+    it('adds images pasted from the clipboard', () => {
+      const file = imageFile('pasted.png');
+      const event = {
+        clipboardData: {
+          items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }]
+        },
+        preventDefault: jasmine.createSpy()
+      } as unknown as ClipboardEvent;
+
+      component.onDocumentPaste(event);
+
+      expect(component.selectedPhotos).toEqual([file]);
+      expect(onChangeSpy).toHaveBeenCalledWith([file]);
+    });
+
+    it('ignores clipboard content without images', () => {
+      const event = {
+        clipboardData: {
+          items: [
+            {
+              kind: 'file',
+              type: 'text/plain',
+              getAsFile: () => new File(['x'], 'a.txt', { type: 'text/plain' })
+            }
+          ]
+        },
+        preventDefault: jasmine.createSpy()
+      } as unknown as ClipboardEvent;
+
+      component.onDocumentPaste(event);
+
+      expect(component.selectedPhotos).toEqual([]);
+      expect(onChangeSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores paste when disabled', () => {
+      component.setDisabledState(true);
+      const file = imageFile('pasted.png');
+      const event = {
+        clipboardData: {
+          items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }]
+        },
+        preventDefault: jasmine.createSpy()
+      } as unknown as ClipboardEvent;
+
+      component.onDocumentPaste(event);
+
+      expect(component.selectedPhotos).toEqual([]);
+      expect(onChangeSpy).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  HostListener,
   Input,
   NgZone,
   Optional,
@@ -20,6 +21,10 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   @Input() multiple = true;
   @Input() accept = 'image/*';
   @Input() maxFiles?: number;
+
+  @Input() maxWidth?: number;
+  @Input() maxHeight?: number;
+  @Input() quality = 0.9;
 
   @Input() height = '200px';
   @Input() thumbnailSize = 100;
@@ -109,6 +114,46 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     }
   }
 
+  @HostListener('document:paste', ['$event'])
+  onDocumentPaste(event: ClipboardEvent): void {
+    if (this.isDisabled) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
+      return;
+    }
+    const files = this.extractImageFiles(event);
+    if (files.length) {
+      event.preventDefault();
+      this.processFiles(files);
+    }
+  }
+
+  private extractImageFiles(event: ClipboardEvent): File[] {
+    const files: File[] = [];
+    const items = event.clipboardData?.items;
+    if (items) {
+      for (const item of Array.from(items)) {
+        const file = item.kind === 'file' ? item.getAsFile() : null;
+        if (file && file.type.startsWith('image/')) {
+          files.push(file);
+        }
+      }
+    }
+    if (files.length === 0) {
+      Array.from(event.clipboardData?.files ?? []).forEach((file) => {
+        if (file.type.startsWith('image/')) {
+          files.push(file);
+        }
+      });
+    }
+    return files;
+  }
+
   removePhoto(index: number): void {
     if (this.isDisabled) {
       return;
@@ -131,17 +176,91 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     this.notifyForm();
   }
 
-  private processFiles(files: File[]): void {
+  private async processFiles(files: File[]): Promise<void> {
+    const accepted: File[] = [];
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
         return;
       }
-      if (this.maxFiles !== undefined && this.selectedPhotos.length >= this.maxFiles) {
+      if (this.maxFiles !== undefined && this.selectedPhotos.length + accepted.length >= this.maxFiles) {
         return;
       }
+      accepted.push(file);
+    });
+
+    if (accepted.length === 0) {
+      return;
+    }
+
+    if (!this.isCompressionEnabled()) {
+      this.addPhotos(accepted);
+      return;
+    }
+
+    const processed = await this.compressImages(accepted);
+    this.ngZone.run(() => this.addPhotos(processed));
+  }
+
+  private addPhotos(files: File[]): void {
+    files.forEach((file) => {
       this.thumbnails.push(URL.createObjectURL(file));
       this.selectedPhotos.push(file);
-      this.notifyForm();
+    });
+    this.notifyForm();
+  }
+
+  private isCompressionEnabled(): boolean {
+    return this.maxWidth != null || this.maxHeight != null;
+  }
+
+  private async compressImages(files: File[]): Promise<File[]> {
+    const result: File[] = [];
+    for (const file of files) {
+      result.push(await this.compressImage(file));
+    }
+    return result;
+  }
+
+  private compressImage(file: File): Promise<File> {
+    const mime = file.type;
+    if (!/^image\/(jpeg|png|webp)$/.test(mime)) {
+      return Promise.resolve(file);
+    }
+
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxWidth = this.maxWidth ?? image.naturalWidth;
+        const maxHeight = this.maxHeight ?? image.naturalHeight;
+        const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+        if (scale >= 1) {
+          resolve(file);
+          return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          resolve(new File([blob], file.name, { type: mime }));
+        }, mime, this.quality);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      image.src = url;
     });
   }
 

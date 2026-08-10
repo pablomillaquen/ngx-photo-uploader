@@ -15,7 +15,9 @@
 - Multiple image selection
 - Automatic preview (blob URLs via `URL.createObjectURL`)
 - Drag & drop with visual feedback
+- Paste images from the clipboard (Ctrl + V)
 - Camera capture (`getUserMedia`)
+- Image compression (`maxWidth`, `maxHeight`, `quality`)
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -74,6 +76,9 @@ The control value is always `File[]`, ready for `FormData`, REST APIs, or multip
 | `multiple`      | `boolean` | `true`           | Allow multiple photos       |
 | `accept`        | `string` | `image/*`          | Accepted file types         |
 | `maxFiles`      | `number` | *unlimited*        | Maximum number of photos    |
+| `maxWidth`      | `number` | *unlimited*        | Max width in px (keeps aspect ratio) |
+| `maxHeight`     | `number` | *unlimited*        | Max height in px (keeps aspect ratio) |
+| `quality`       | `number` | `0.9`              | JPEG/WebP compression quality (0-1) |
 | `height`        | `string` | `200px`            | Container height            |
 | `thumbnailSize` | `number` | `100`              | Thumbnail size (px)         |
 | `gap`           | `number` | `10`               | Space between thumbnails (px) |
@@ -105,6 +110,29 @@ The component includes a **"Use camera"** button to capture images directly from
 - Tracks are stopped on close to avoid leaks
 
 > Requires a **HTTPS** connection (or localhost) due to `getUserMedia`.
+
+## Paste from clipboard
+
+Press `Ctrl + V` (or `Cmd + V` on macOS) anywhere on the page to paste an image from the clipboard (e.g. screenshots). Pasted images are processed exactly like uploaded ones, so `maxFiles`, validators and compression all apply.
+
+> The paste is not intercepted when the focus is inside an `input` or `textarea`.
+
+## Image compression
+
+Set `maxWidth` and/or `maxHeight` to automatically scale down images **before** they are emitted as `File`. The aspect ratio is preserved and the file is re-encoded with the configured `quality`.
+
+```html
+<photo-uploader
+  formControlName="photos"
+  [maxWidth]="1024"
+  [maxHeight]="768"
+  [quality]="0.8"
+></photo-uploader>
+```
+
+- Only JPEG, PNG and WebP images are compressed; GIF and SVG are kept as-is.
+- Images already within the limits are left untouched (no re-encoding).
+- Compression also applies to camera captures and pasted images.
 
 ## Bundled validators
 
@@ -166,11 +194,11 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 
 ## Roadmap
 
-- Image compression (`maxWidth`, `maxHeight`, `quality`)
+- ✅ Image compression (`maxWidth`, `maxHeight`, `quality`)
+- ✅ Paste from clipboard (Ctrl + V)
 - EXIF orientation correction
 - Cropping support
 - Image reordering
-- Paste from clipboard (Ctrl + V)
 - Theme customization
 - i18n
 
