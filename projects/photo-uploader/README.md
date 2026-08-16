@@ -11,6 +11,8 @@
 - Paste images from the clipboard (Ctrl + V)
 - Camera capture (`getUserMedia`)
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
+- EXIF orientation correction (rotated phone photos display correctly)
+- Drag thumbnails to reorder
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -127,6 +129,21 @@ Set `maxWidth` and/or `maxHeight` to automatically scale down images **before** 
 - Images already within the limits are left untouched (no re-encoding).
 - Compression also applies to camera captures and pasted images.
 
+## EXIF orientation
+
+Photos taken with a phone or camera often carry an EXIF orientation flag (rotation), so they appear rotated in browsers. When compression is enabled, the component reads the flag from **JPEG** files and **bakes the correct rotation** into the re-encoded image — the emitted file no longer depends on the EXIF flag and always displays upright.
+
+- EXIF is read from JPEG files only; PNG and WebP are re-encoded as-is and GIF/SVG are never touched.
+- Applied on upload, camera capture and paste.
+- Without compression settings, the original file is preserved as-is; the preview still displays correctly because browsers render images with EXIF orientation by default (`image-orientation: from-image`).
+
+## Image reordering
+
+Thumbnails are **draggable**: drag a thumbnail and drop it on another position to reorder the photos. The emitted `File[]` follows the new order, so the images are uploaded in the order the user left them.
+
+- Only the order changes — files are **not** re-encoded on reorder.
+- Works with `Reactive Forms`: the control value reflects the new order immediately.
+
 ## Bundled validators
 
 The library exports reusable validators:
@@ -175,15 +192,21 @@ this.form = this.fb.group({
 
 - Automatic disabled state with Forms
 - Visual invalid state (red border) via `NgControl`
-- Aria-labels on action buttons
+- Aria-labels on thumbnails (`Imagen N`), remove buttons (`Eliminar foto N`) and upload icon (decorative, `aria-hidden`)
+- Native `<button>` elements for camera, capture/cancel and clear actions — keyboard accessible
 
 ## Roadmap
 
 - ✅ Image compression (`maxWidth`, `maxHeight`, `quality`)
 - ✅ Paste from clipboard (Ctrl + V)
-- EXIF orientation correction
+- ✅ EXIF orientation correction
+- ✅ Image reordering
+- Accessible file picker (focusable drop zone, `role="button"` + keyboard)
+- Keyboard drag-reorder (move thumbnails with arrow keys / buttons)
+- Focus management and visible focus indicators
+- ARIA live regions for upload feedback
+- Sufficient color contrast (WCAG 2.2 AA)
 - Cropping support
-- Image reordering
 - Theme customization
 - i18n
 
