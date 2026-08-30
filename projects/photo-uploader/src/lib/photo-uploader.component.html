@@ -39,14 +39,16 @@
   </div>
 
   @if (thumbnails.length) {
-    <div class="thumbnails" [style.gap.px]="gap">
+    <div class="thumbnails" #thumbnailsEl [style.gap.px]="gap">
       @for (thumbnail of thumbnails; track $index) {
         <div
           class="thumbnail"
           [class.dragging]="dragIndex === $index"
+          [class.touch-dragging]="touchDragIndex === $index"
+          [class.insert-target]="isTouchDragging && touchDragIndex !== null && touchInsertIndex === $index"
           [style.width.px]="thumbnailSize"
           [style.height.px]="thumbnailSize"
-          draggable="true"
+          [attr.draggable]="isTouchDevice ? 'false' : 'true'"
           (dragstart)="onDragStart($event, $index)"
           (dragover)="onThumbDragOver($event)"
           (drop)="onThumbDrop($event, $index)"
@@ -61,11 +63,18 @@
             fill="currentColor"
             aria-hidden="true"
             title="Arrastrar para reordenar"
+            (touchstart)="onTouchStart($event, $index)"
+            (touchmove)="onTouchMove($event)"
+            (touchend)="onTouchEnd()"
+            (touchcancel)="onTouchCancel()"
           >
             <path
               d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2Zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2Zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2Zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2Zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2Zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2Z"
             />
           </svg>
+          @if (touchDragIndex === $index) {
+            <span class="touch-placeholder"></span>
+          }
           <button
             type="button"
             class="remove"
@@ -87,6 +96,18 @@
         </div>
       }
     </div>
+    @if (isTouchDragging && touchDragIndex !== null) {
+      <div
+        class="touch-drag-overlay"
+        [style.width.px]="thumbnailSize"
+        [style.height.px]="thumbnailSize"
+        [style.left.px]="touchDragX"
+        [style.top.px]="touchDragY"
+        [style.pointerEvents]="'none'"
+      >
+        <img [src]="thumbnails[touchDragIndex]" alt="" />
+      </div>
+    }
   }
 
   <div class="actions">

@@ -12,7 +12,7 @@
 - Camera capture (`getUserMedia`)
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
 - EXIF orientation correction (rotated phone photos display correctly)
-- Drag thumbnails to reorder
+- Reorder thumbnails — drag & drop on desktop, long-press on touch
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -139,7 +139,12 @@ Photos taken with a phone or camera often carry an EXIF orientation flag (rotati
 
 ## Image reordering
 
-Thumbnails are **draggable**: drag a thumbnail and drop it on another position to reorder the photos. The emitted `File[]` follows the new order, so the images are uploaded in the order the user left them.
+Thumbnails can be reordered in two ways:
+
+- **Drag & drop** (mouse/desktop): drag a thumbnail and drop it on another position.
+- **Touch** (mobile): press and hold the drag handle (`long-press`) to pick it up, then drag with your finger. A floating preview follows your finger and the target position is highlighted.
+
+The emitted `File[]` follows the new order, so the images are uploaded in the order the user left them.
 
 - Only the order changes — files are **not** re-encoded on reorder.
 - Works with `Reactive Forms`: the control value reflects the new order immediately.
@@ -197,18 +202,52 @@ this.form = this.fb.group({
 
 ## Roadmap
 
+**Done**
+
 - ✅ Image compression (`maxWidth`, `maxHeight`, `quality`)
 - ✅ Paste from clipboard (Ctrl + V)
 - ✅ EXIF orientation correction
-- ✅ Image reordering
+- ✅ Image reordering (drag & drop on desktop + long-press touch reorder)
+
+**1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
+
+- Responsive layout that adapts to small screens
+- Touch targets ≥ 44px on thumbnails, actions and remove buttons
+- Camera: switch front/rear, zoom and flash
+
+**2. Accessibility (WCAG 2.2)**
+
 - Accessible file picker (focusable drop zone, `role="button"` + keyboard)
-- Keyboard drag-reorder (move thumbnails with arrow keys / buttons)
+- Keyboard drag-reorder (arrow keys / reorder buttons)
 - Focus management and visible focus indicators
 - ARIA live regions for upload feedback
 - Sufficient color contrast (WCAG 2.2 AA)
+- `prefers-reduced-motion` support
+
+**3. Visual & image features** (leverage Angular's strengths for image preview)
+
 - Cropping support
+- Thumbnail badges (dimensions, file size, processing status)
+- Custom placeholders and per-thumbnail actions via content projection (`ng-template`)
+
+**4. Processing & API**
+
+- HEIC/HEIF support (iPhone photos)
+- Concurrent image compression with a concurrency limit
+- Web Worker for heavy re-encoding (non-blocking UI)
+- Per-image metadata output (`{ file, original, dimension, compressionRatio, error }`) and granular events (`photoAdded`, `photoRemoved`, `reordered`, `ready`)
+- Per-format quality settings (`jpgQuality`, `pngCompression`) instead of a single `quality`
+- Cancellable processing (`AbortController`) with per-thumbnail error state and retry
+- `maxFiles` counter UX ("3/5") with auto-eviction of the oldest photo
+- SSR / hydration support verification
+
+**5. Distribution & quality**
+
 - Theme customization
-- i18n
+- i18n (multi-language)
+- Visual regression tests (Playwright) and accessibility tests (axe-core)
+
+> **Release cadence**: one feature per week after each release.
 
 ## License
 

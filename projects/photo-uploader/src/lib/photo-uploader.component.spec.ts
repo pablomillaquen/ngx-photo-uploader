@@ -424,4 +424,104 @@ describe('PhotoUploaderComponent', () => {
       expect(component.dragIndex).toBeNull();
     });
   });
+
+  describe('touch reordering', () => {
+    const mkThumb = (left: number, width = 100) => ({
+      getBoundingClientRect: () => ({ left, width, right: left + width })
+    });
+
+    const mkElementFromPoint = (thumbs: unknown[]) =>
+      spyOn(document, 'elementFromPoint').and.returnValue({
+        closest: (sel: string) => (sel === '.thumbnail' ? thumbs[1] : null)
+      } as unknown as Element);
+
+    const setupTouch = (thumbs: unknown[]) => {
+      component.thumbnailsEl = new ElementRef({ children: thumbs } as unknown as HTMLDivElement);
+      mkElementFromPoint(thumbs);
+    };
+
+    const touchEvent = (x: number, y = 0) =>
+      ({ touches: [{ clientX: x, clientY: y }], preventDefault: () => undefined }) as unknown as TouchEvent;
+
+    beforeEach(() => {
+      jasmine.clock().install();
+    });
+
+    afterEach(() => {
+      jasmine.clock().uninstall();
+      component.onTouchCancel();
+    });
+
+    it('starts dragging after a long press (>400ms)', () => {
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      component.onFilesSelected(selectionEvent([a, b]));
+
+      component.onTouchStart({ touches: [{ clientX: 50, clientY: 50 }] } as unknown as TouchEvent, 0);
+
+      expect(component.touchDragIndex).toBeNull();
+      jasmine.clock().tick(400);
+      expect(component.touchDragIndex).toBe(0);
+      expect(component.isTouchDragging).toBe(true);
+    });
+
+    it('reorders the list when the touch ends on a drop target', () => {
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      const c = imageFile('c.png');
+      component.onFilesSelected(selectionEvent([a, b, c]));
+      const thumbs = [mkThumb(0), mkThumb(120), mkThumb(240)];
+      setupTouch(thumbs);
+
+      component.onTouchStart(touchEvent(50), 0);
+      jasmine.clock().tick(400);
+      component.onTouchMove(touchEvent(159)); // center of thumb 1 = 170 -> insert before it (1)
+      component.onTouchEnd();
+
+      expect(component.selectedPhotos).toEqual([b, a, c]);
+      expect(onChangeSpy).toHaveBeenCalledWith([b, a, c]);
+      expect(component.isTouchDragging).toBe(false);
+    });
+
+    it('moves the thumbnail to the end when dropped past the last one', () => {
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      const c = imageFile('c.png');
+      component.onFilesSelected(selectionEvent([a, b, c]));
+      const thumbs = [mkThumb(0), mkThumb(120), mkThumb(240)];
+      setupTouch(thumbs);
+
+      component.onTouchStart(touchEvent(50), 0);
+      jasmine.clock().tick(400);
+      component.onTouchMove(touchEvent(500)); // past last centera -> to=3 (end)
+      component.onTouchEnd();
+
+      expect(component.selectedPhotos).toEqual([b, c, a]);
+    });
+
+    it('cancelling the gesture does not reorder', () => {
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      component.onFilesSelected(selectionEvent([a, b]));
+
+      component.onTouchStart(touchEvent(50), 0);
+      jasmine.clock().tick(400);
+      component.onTouchCancel();
+
+      expect(component.selectedPhotos).toEqual([a, b]);
+      expect(component.isTouchDragging).toBe(false);
+      expect(component.touchDragIndex).toBeNull();
+    });
+
+    it('does not start dragging when there is a single photo', () => {
+      const a = imageFile('a.png');
+      component.onFilesSelected(selectionEvent([a]));
+
+      component.onTouchStart(touchEvent(50), 0);
+      jasmine.clock().tick(400);
+
+      expect(component.touchDragIndex).toBeNull();
+      expect(component.isTouchDragging).toBe(false);
+    });
+  });
 });

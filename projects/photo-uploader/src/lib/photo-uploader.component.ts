@@ -33,6 +33,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   @Input() placeholder = 'Click o arrastra para cargar fotos';
 
   @ViewChild('video') videoElement?: ElementRef<HTMLVideoElement>;
+  @ViewChild('thumbnailsEl') thumbnailsEl?: ElementRef<HTMLDivElement>;
 
   thumbnails: string[] = [];
   selectedPhotos: File[] = [];
@@ -42,6 +43,19 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   isCameraOpen = false;
   videoStream?: MediaStream;
   dragIndex: number | null = null;
+
+  get isTouchDevice(): boolean {
+    return typeof window !== 'undefined' && ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches);
+  }
+
+  isTouchDragging = false;
+  touchDragIndex: number | null = null;
+  touchInsertIndex = -1;
+  touchDragX = 0;
+  touchDragY = 0;
+  private touchTimer: ReturnType<typeof setTimeout> | undefined;
+  private touchStartX = 0;
+  private touchStartY = 0;
 
   onChange: (value: File[]) => void = () => {};
   onTouched: () => void = () => {};
@@ -193,18 +207,107 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     }
     const from = this.dragIndex;
     this.dragIndex = null;
-    if (from === index) {
-      return;
-    }
-    const [thumbnail] = this.thumbnails.splice(from, 1);
-    this.thumbnails.splice(index, 0, thumbnail);
-    const [photo] = this.selectedPhotos.splice(from, 1);
-    this.selectedPhotos.splice(index, 0, photo);
-    this.notifyForm();
+    this.applyMove(from, index);
   }
 
   onDragEnd(): void {
     this.dragIndex = null;
+  }
+
+  private applyMove(from: number, to: number): void {
+    if (from === to || from < 0 || from >= this.thumbnails.length || to > this.thumbnails.length) {
+      return;
+    }
+    const [thumbnail] = this.thumbnails.splice(from, 1);
+    this.thumbnails.splice(to, 0, thumbnail);
+    const [photo] = this.selectedPhotos.splice(from, 1);
+    this.selectedPhotos.splice(to, 0, photo);
+    this.notifyForm();
+  }
+
+  // ---------- Reordenado táctil (long-press) ----------
+
+  onTouchStart(event: TouchEvent, index: number): void {
+    if (this.isDisabled || this.thumbnails.length < 2) {
+      return;
+    }
+    const touch = event.touches[0];
+    this.touchStartX = touch.clientX;
+    this.touchStartY = touch.clientY;
+    this.touchTimer = setTimeout(() => {
+      this.ngZone.run(() => {
+        this.touchDragIndex = index;
+        this.isTouchDragging = true;
+        this.touchInsertIndex = index;
+        this.setTouchPosition(touch);
+      });
+    }, 400);
+  }
+
+  onTouchMove(event: TouchEvent): void {
+    if (!this.isTouchDragging) {
+      return;
+    }
+    const touch = event.touches[0];
+    event.preventDefault();
+    this.setTouchPosition(touch);
+    this.computeInsertIndex(touch.clientX, touch.clientY);
+  }
+
+  onTouchEnd(): void {
+    this.clearTouchTimer();
+    if (this.touchDragIndex === null) {
+      return;
+    }
+    const from = this.touchDragIndex;
+    const to = this.touchInsertIndex;
+    this.touchDragIndex = null;
+    this.isTouchDragging = false;
+    this.touchInsertIndex = -1;
+    this.applyMove(from, to);
+  }
+
+  onTouchCancel(): void {
+    this.clearTouchTimer();
+    this.touchDragIndex = null;
+    this.isTouchDragging = false;
+    this.touchInsertIndex = -1;
+  }
+
+  private clearTouchTimer(): void {
+    if (this.touchTimer) {
+      clearTimeout(this.touchTimer);
+      this.touchTimer = undefined;
+    }
+  }
+
+  private setTouchPosition(touch: Touch): void {
+    this.touchDragX = touch.clientX;
+    this.touchDragY = touch.clientY;
+  }
+
+  private computeInsertIndex(clientX: number, clientY: number): void {
+    if (!this.thumbnailsEl) {
+      return;
+    }
+    const thumbs = Array.from(this.thumbnailsEl.nativeElement.children) as HTMLElement[];
+    if (thumbs.length === 0) {
+      return;
+    }
+    let nearest = 0;
+    let nearestDist = Infinity;
+    thumbs.forEach((thumb, i) => {
+      const r = thumb.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const d = Math.hypot(clientX - cx, clientY - cy);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = i;
+      }
+    });
+    const rect = thumbs[nearest].getBoundingClientRect();
+    this.touchInsertIndex = clientX >= rect.left + rect.width / 2 ? nearest + 1 : nearest;
   }
 
   clearPhotos(): void {
