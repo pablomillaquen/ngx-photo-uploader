@@ -1,3 +1,5 @@
+$touch-target: 44px;
+
 .photo-uploader {
   .upload-container {
     display: flex;
@@ -63,34 +65,36 @@
 
       .drag-handle {
         position: absolute;
-        top: 4px;
-        left: 4px;
-        width: 26px;
-        height: 26px;
-        padding: 3px;
+        top: 0;
+        left: 0;
+        width: $touch-target;
+        height: $touch-target;
         display: flex;
         align-items: center;
         justify-content: center;
         color: #666;
-        background: rgba(255, 255, 255, 0.75);
-        border-radius: 4px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-        opacity: 0.6;
-        transition: opacity 0.2s, color 0.2s;
+        background: transparent;
+        opacity: 0.8;
+        transition: opacity 0.2s, color 0.2s, background-color 0.2s;
         pointer-events: auto;
         touch-action: none;
         cursor: grab;
         z-index: 2;
+        border-radius: 4px;
 
         svg {
-          width: 16px;
-          height: 16px;
+          width: 20px;
+          height: 20px;
+          filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
         }
-      }
 
-      &:hover .drag-handle {
-        opacity: 1;
-        color: #3f51b5;
+        &:hover,
+        &.handle-active {
+          opacity: 1;
+          color: #3f51b5;
+          background: rgba(255, 255, 255, 0.85);
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
       }
 
       &.touch-dragging {
@@ -113,8 +117,8 @@
         position: absolute;
         top: -8px;
         right: -8px;
-        width: 24px;
-        height: 24px;
+        width: $touch-target;
+        height: $touch-target;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -126,8 +130,8 @@
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 
         svg {
-          width: 14px;
-          height: 14px;
+          width: 18px;
+          height: 18px;
         }
 
         &[disabled] {
@@ -170,10 +174,14 @@
 
     .clear,
     .camera-toggle {
+      min-height: $touch-target;
       padding: 6px 16px;
       border-radius: 4px;
       font-size: 14px;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .clear {
@@ -230,10 +238,14 @@
 
       .capture,
       .cancel {
+        min-height: $touch-target;
         padding: 6px 16px;
         border-radius: 4px;
         font-size: 14px;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .capture {

@@ -206,6 +206,7 @@ this.form = this.fb.group({
 - Visual invalid state (red border) via `NgControl`
 - Aria-labels on thumbnails (`Imagen N`), remove buttons (`Eliminar foto N`) and upload icon (decorative, `aria-hidden`)
 - Native `<button>` elements for camera, capture/cancel and clear actions — keyboard accessible
+- Touch targets ≥ 44×44px (WCAG 2.2 target size) on drag handle, remove buttons and action buttons
 
 ## Development
 
@@ -223,11 +224,11 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 - ✅ Paste from clipboard (Ctrl + V)
 - ✅ EXIF orientation correction
 - ✅ Image reordering (drag & drop on desktop + long-press touch reorder)
+- ✅ Touch targets ≥ 44px on thumbnails, actions and remove buttons
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
 - Responsive layout that adapts to small screens
-- Touch targets ≥ 44px on thumbnails, actions and remove buttons
 - Camera: switch front/rear, zoom and flash
 
 **2. Accessibility (WCAG 2.2)**
