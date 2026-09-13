@@ -53,6 +53,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   touchInsertIndex = -1;
   touchDragX = 0;
   touchDragY = 0;
+  touchDragSize = 0;
   private touchTimer: ReturnType<typeof setTimeout> | undefined;
   private touchStartX = 0;
   private touchStartY = 0;
@@ -239,6 +240,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
         this.touchDragIndex = index;
         this.isTouchDragging = true;
         this.touchInsertIndex = index;
+        this.touchDragSize = this.measureThumbSize(index);
         this.setTouchPosition(touch);
       });
     }, 400);
@@ -264,6 +266,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     this.touchDragIndex = null;
     this.isTouchDragging = false;
     this.touchInsertIndex = -1;
+    this.touchDragSize = 0;
     this.applyMove(from, to);
   }
 
@@ -272,6 +275,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     this.touchDragIndex = null;
     this.isTouchDragging = false;
     this.touchInsertIndex = -1;
+    this.touchDragSize = 0;
   }
 
   private clearTouchTimer(): void {
@@ -279,6 +283,12 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
       clearTimeout(this.touchTimer);
       this.touchTimer = undefined;
     }
+  }
+
+  private measureThumbSize(index: number): number {
+    const thumb = this.thumbnailsEl?.nativeElement.children[index] as HTMLElement | undefined;
+    const width = thumb?.getBoundingClientRect().width ?? 0;
+    return width > 0 ? width : this.thumbnailSize;
   }
 
   private setTouchPosition(touch: Touch): void {

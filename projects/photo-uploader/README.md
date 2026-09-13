@@ -13,6 +13,7 @@
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
 - EXIF orientation correction (rotated phone photos display correctly)
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
+- Responsive thumbnail grid — fluid, square thumbnails that adapt to any screen size
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -210,10 +211,10 @@ this.form = this.fb.group({
 - ✅ EXIF orientation correction
 - ✅ Image reordering (drag & drop on desktop + long-press touch reorder)
 - ✅ Touch targets ≥ 44px on thumbnails, actions and remove buttons
+- ✅ Responsive layout — fluid thumbnail grid and action buttons adapt to small screens
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
-- Responsive layout that adapts to small screens
 - Camera: switch front/rear, zoom and flash
 
 **2. Accessibility (WCAG 2.2)**

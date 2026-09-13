@@ -463,6 +463,7 @@ describe('PhotoUploaderComponent', () => {
       jasmine.clock().tick(400);
       expect(component.touchDragIndex).toBe(0);
       expect(component.isTouchDragging).toBe(true);
+      expect(component.touchDragSize).toBe(component.thumbnailSize);
     });
 
     it('reorders the list when the touch ends on a drop target', () => {

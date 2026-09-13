@@ -39,15 +39,18 @@
   </div>
 
   @if (thumbnails.length) {
-    <div class="thumbnails" #thumbnailsEl [style.gap.px]="gap">
+    <div
+      class="thumbnails"
+      #thumbnailsEl
+      [style.--uploader-gap.px]="gap"
+      [style.--thumb-size.px]="thumbnailSize"
+    >
       @for (thumbnail of thumbnails; track $index) {
         <div
           class="thumbnail"
           [class.dragging]="dragIndex === $index"
           [class.touch-dragging]="touchDragIndex === $index"
           [class.insert-target]="isTouchDragging && touchDragIndex !== null && touchInsertIndex === $index"
-          [style.width.px]="thumbnailSize"
-          [style.height.px]="thumbnailSize"
           [attr.draggable]="isTouchDevice ? 'false' : 'true'"
           (dragstart)="onDragStart($event, $index)"
           (dragover)="onThumbDragOver($event)"
@@ -99,8 +102,8 @@
     @if (isTouchDragging && touchDragIndex !== null) {
       <div
         class="touch-drag-overlay"
-        [style.width.px]="thumbnailSize"
-        [style.height.px]="thumbnailSize"
+        [style.width.px]="touchDragSize"
+        [style.height.px]="touchDragSize"
         [style.left.px]="touchDragX"
         [style.top.px]="touchDragY"
         [style.pointerEvents]="'none'"

@@ -41,13 +41,21 @@ $touch-target: 44px;
 
   .thumbnails {
     position: relative;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, calc(var(--thumb-size) * 0.6)), var(--thumb-size))
+    );
+    justify-content: center;
+    gap: var(--uploader-gap, 10px);
     margin-top: 10px;
     user-select: none;
 
     .thumbnail {
       position: relative;
+      width: 100%;
+      min-width: 0;
+      aspect-ratio: 1;
       cursor: grab;
 
       &.dragging {
@@ -168,6 +176,7 @@ $touch-target: 44px;
 
   .actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
     margin-top: 10px;
@@ -233,6 +242,7 @@ $touch-target: 44px;
     .camera-actions {
       margin-top: 8px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
       gap: 12px;
 
@@ -267,6 +277,28 @@ $touch-target: 44px;
           background: rgba(244, 67, 54, 0.08);
         }
       }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .photo-uploader {
+    .upload-container {
+      min-height: 120px;
+    }
+
+    .upload-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .upload-placeholder {
+      font-size: 14px;
+    }
+
+    .actions,
+    .camera-actions {
+      gap: 8px;
     }
   }
 }
