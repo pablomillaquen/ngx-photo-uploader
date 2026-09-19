@@ -534,15 +534,33 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
 
   // ---------- Cámara ----------
 
-  async openCamera(): Promise<void> {
+  cameraFacing: 'environment' | 'user' = 'environment';
+  cameraZoom = 1;
+  cameraZoomMax = 3;
+  zoomSupported = false;
+  cameraFlash = false;
+  flashSupported = false;
+  private pinchStartDistance = 0;
+  private pinchStartZoom = 1;
+
+  async openCamera(facing: 'environment' | 'user' = this.cameraFacing): Promise<void> {
     if (this.isDisabled) {
       return;
     }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      console.error('No se pudo acceder a la cámara: getUserMedia no está disponible');
+      return;
+    }
     try {
-      this.videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing }
       });
+      this.closeCamera();
+      this.videoStream = stream;
+      this.cameraFacing = facing;
       this.isCameraOpen = true;
+      this.cameraZoom = 1;
+      this.setupCameraCapabilities();
       setTimeout(() => {
         if (this.videoElement) {
           this.videoElement.nativeElement.srcObject = this.videoStream!;
@@ -550,6 +568,99 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
       });
     } catch (err) {
       console.error('No se pudo acceder a la cámara', err);
+    }
+  }
+
+  async switchCamera(): Promise<void> {
+    const next = this.cameraFacing === 'environment' ? 'user' : 'environment';
+    await this.openCamera(next);
+  }
+
+  setZoomFromEvent(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.setCameraZoom(Number.isFinite(value) ? value : 1);
+  }
+
+  async setCameraZoom(zoom: number): Promise<void> {
+    const next = Math.min(Math.max(zoom, 1), this.cameraZoomMax);
+    this.cameraZoom = next;
+    const track = this.videoStream?.getVideoTracks()[0];
+    if (track && this.zoomSupported && typeof track.applyConstraints === 'function') {
+      try {
+        await track.applyConstraints(({ advanced: [{ zoom: next }] }) as unknown as MediaTrackConstraints);
+      } catch {
+        this.zoomSupported = false;
+      }
+    }
+  }
+
+  async toggleFlash(): Promise<void> {
+    const track = this.videoStream?.getVideoTracks()[0];
+    if (!track || typeof track.applyConstraints !== 'function') {
+      return;
+    }
+    const next = !this.cameraFlash;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet]
+      } as MediaTrackConstraints);
+      this.cameraFlash = next;
+    } catch {
+      this.flashSupported = false;
+      this.cameraFlash = false;
+    }
+  }
+
+  onCameraTouchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      this.pinchStartDistance = this.pinchDistance(event);
+      this.pinchStartZoom = this.cameraZoom;
+    }
+  }
+
+  onCameraTouchMove(event: TouchEvent): void {
+    if (event.touches.length === 2 && this.pinchStartDistance > 0) {
+      event.preventDefault();
+      const zoom = this.pinchStartZoom * (this.pinchDistance(event) / this.pinchStartDistance);
+      this.setCameraZoom(zoom);
+    }
+  }
+
+  onCameraTouchEnd(): void {
+    this.pinchStartDistance = 0;
+  }
+
+  private pinchDistance(event: TouchEvent): number {
+    const t = event.touches;
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  }
+
+  private setupCameraCapabilities(): void {
+    const track = this.videoStream?.getVideoTracks()[0];
+    if (!track || typeof track.getCapabilities !== 'function') {
+      this.zoomSupported = false;
+      this.flashSupported = false;
+      return;
+    }
+    const caps = track.getCapabilities() as {
+      zoom?: { min?: number; max?: number };
+      torch?: boolean;
+    };
+    if (caps.zoom && (caps.zoom.max ?? 1) > 1) {
+      this.zoomSupported = true;
+      this.cameraZoomMax = caps.zoom.max!;
+    } else {
+      this.zoomSupported = false;
+      this.cameraZoomMax = 3;
+    }
+    this.flashSupported = Boolean(caps.torch);
+    if (!this.flashSupported && typeof track.applyConstraints === 'function') {
+      track
+        .applyConstraints({
+          advanced: [{ torch: false } as MediaTrackConstraintSet]
+        } as MediaTrackConstraints)
+        .then(() => (this.flashSupported = true))
+        .catch(() => (this.flashSupported = false));
     }
   }
 
@@ -567,7 +678,25 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
       return;
     }
 
-    ctx.drawImage(video, 0, 0);
+    if (this.cameraZoom > 1 && !this.zoomSupported) {
+      const zoom = this.cameraZoom;
+      const srcW = video.videoWidth / zoom;
+      const srcH = video.videoHeight / zoom;
+      ctx.drawImage(
+        video,
+        (video.videoWidth - srcW) / 2,
+        (video.videoHeight - srcH) / 2,
+        srcW,
+        srcH,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+    } else {
+      ctx.drawImage(video, 0, 0);
+    }
+
     canvas.toBlob((blob) => {
       // toBlob es asíncrono y su callback corre fuera de la zona de Angular;
       // si mutáramos el estado fuera de ella la vista no se actualizaría

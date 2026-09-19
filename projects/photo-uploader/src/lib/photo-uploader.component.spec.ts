@@ -211,6 +211,130 @@ describe('PhotoUploaderComponent', () => {
     }, 300);
   });
 
+  describe('camera controls', () => {
+    const makeTrack = () => ({
+      getCapabilities: jasmine
+        .createSpy('getCapabilities')
+        .and.returnValue({ zoom: { min: 1, max: 4 } }),
+      applyConstraints: jasmine.createSpy('applyConstraints').and.returnValue(Promise.resolve()),
+      stop: jasmine.createSpy('stop')
+    });
+
+    const makeStream = (track: ReturnType<typeof makeTrack>) => ({
+      getVideoTracks: () => [track],
+      getTracks: () => [track]
+    });
+
+    const mocks = () => {
+      const track = makeTrack();
+      const stream = makeStream(track);
+      const getUserMedia = jasmine
+        .createSpy('getUserMedia')
+        .and.returnValue(Promise.resolve(stream));
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: { getUserMedia },
+        configurable: true,
+        writable: true
+      });
+      return { getUserMedia, stream, track };
+    };
+
+    afterEach(() => {
+      delete (navigator as unknown as { mediaDevices?: unknown }).mediaDevices;
+    });
+
+    it('opens the camera with the environment facing mode and detects capabilities', async () => {
+      const { getUserMedia } = mocks();
+      await component.openCamera();
+
+      expect(getUserMedia).toHaveBeenCalledWith({ video: { facingMode: 'environment' } });
+      expect(component.isCameraOpen).toBe(true);
+      expect(component.zoomSupported).toBe(true);
+      expect(component.cameraZoomMax).toBe(4);
+      expect(component.flashSupported).toBe(true);
+    });
+
+    it('switchCamera stops the previous stream and reopens with the user facing mode', async () => {
+      const { getUserMedia, track } = mocks();
+      await component.openCamera();
+      expect(component.cameraFacing).toBe('environment');
+
+      await component.switchCamera();
+
+      expect(component.cameraFacing).toBe('user');
+      expect(track.stop).toHaveBeenCalled();
+      expect(getUserMedia.calls.allArgs()[1]).toEqual([{ video: { facingMode: 'user' } }]);
+      expect(component.cameraZoom).toBe(1);
+    });
+
+    it('setCameraZoom clamps to the supported range and applies the native zoom constraint', async () => {
+      const { track } = mocks();
+      await component.openCamera();
+
+      await component.setCameraZoom(10);
+
+      expect(component.cameraZoom).toBe(4);
+      const calls = track.applyConstraints.calls.allArgs();
+      expect(
+        calls.some(
+          ([c]) => c.advanced?.some((s: MediaTrackConstraintSet) => (s as { zoom?: number }).zoom === 4)
+        )
+      ).toBe(true);
+    });
+
+    it('setCameraZoom does not go below 1', async () => {
+      mocks();
+      await component.openCamera();
+
+      await component.setCameraZoom(0.2);
+
+      expect(component.cameraZoom).toBe(1);
+    });
+
+    it('toggleFlash applies the torch constraint and updates state', async () => {
+      const { track } = mocks();
+      await component.openCamera();
+
+      await component.toggleFlash();
+
+      expect(component.cameraFlash).toBe(true);
+      const calls = track.applyConstraints.calls.allArgs();
+      expect(
+        calls.some(
+          ([c]) => c.advanced?.some((s: MediaTrackConstraintSet) => (s as { torch?: boolean }).torch === true)
+        )
+      ).toBe(true);
+    });
+
+    it('takePhoto crops the central area when zoomed without native zoom support', (done) => {
+      const drawImageSpy = jasmine.createSpy('drawImage');
+      spyOn(HTMLCanvasElement.prototype, 'getContext').and.returnValue({
+        drawImage: drawImageSpy
+      } as unknown as CanvasRenderingContext2D);
+
+      component.videoStream = { getTracks: () => [] } as unknown as MediaStream;
+      component.videoElement = {
+        nativeElement: { videoWidth: 50, videoHeight: 40 }
+      } as unknown as ElementRef<HTMLVideoElement>;
+      component.cameraZoom = 2;
+      component.zoomSupported = false;
+
+      component.takePhoto();
+      expect(drawImageSpy.calls.first().args.length).toBe(9);
+      const args = drawImageSpy.calls.first().args;
+      expect(args[0]).toBe(component.videoElement!.nativeElement);
+      expect(args[1]).toBeCloseTo(12.5);
+      expect(args[2]).toBeCloseTo(10);
+      expect(args[3]).toBeCloseTo(25);
+      expect(args[4]).toBeCloseTo(20);
+
+      setTimeout(() => {
+        expect(component.selectedPhotos.length).toBe(1);
+        done();
+      }, 300);
+    });
+  });
+
   describe('image compression', () => {
     it('compresses images larger than maxWidth', async () => {
       component.maxWidth = 100;

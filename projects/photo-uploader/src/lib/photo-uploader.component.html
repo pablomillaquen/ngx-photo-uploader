@@ -139,10 +139,80 @@
 
   @if (isCameraOpen) {
     <div class="camera">
-      <video #video autoplay playsinline></video>
+      <div
+        class="camera-viewport"
+        (touchstart)="onCameraTouchStart($event)"
+        (touchmove)="onCameraTouchMove($event)"
+        (touchend)="onCameraTouchEnd()"
+        (touchcancel)="onCameraTouchEnd()"
+      >
+        <video
+          #video
+          autoplay
+          playsinline
+          [style.transform]="cameraZoom > 1 && !zoomSupported ? 'scale(' + cameraZoom + ')' : null"
+        ></video>
+
+        <div class="camera-toolbar">
+          <button
+            type="button"
+            class="camera-control"
+            [attr.aria-label]="
+              'Cambiar a cámara ' + (cameraFacing === 'environment' ? 'frontal' : 'trasera')
+            "
+            (click)="switchCamera()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 14c-2.76 0-5-2.24-5-5h2l-3-4-3 4h2c0 3.31 2.69 6 6 6 .36 0 .71-.04 1.05-.11l-1.11-1.11c-.31.05-.63.08-.94.08zm5-2.5L20 20l3-4h-2c0-3.31-2.69-6-6-6-.36 0-.71.04-1.05.11l1.11 1.11c.31-.05.63-.08.94-.08 2.21 0 4 1.79 4 4h2z"
+              />
+            </svg>
+          </button>
+
+          @if (flashSupported) {
+            <button
+              type="button"
+              class="camera-control"
+              [class.flash-on]="cameraFlash"
+              [attr.aria-label]="cameraFlash ? 'Apagar flash' : 'Activar flash'"
+              [attr.aria-pressed]="cameraFlash"
+              (click)="toggleFlash()"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M7 2v11h3v9l7-12h-4l4-8z" />
+              </svg>
+            </button>
+          }
+        </div>
+
+        @if (cameraZoomMax > 1) {
+          <div class="camera-zoom">
+            <input
+              type="range"
+              class="zoom-slider"
+              min="1"
+              [max]="cameraZoomMax"
+              step="0.1"
+              [value]="cameraZoom"
+              aria-label="Zoom de la cámara"
+              (input)="setZoomFromEvent($event)"
+            />
+          </div>
+        }
+      </div>
       <div class="camera-actions">
-        <button type="button" class="capture" (click)="takePhoto()">Capturar</button>
         <button type="button" class="cancel" (click)="closeCamera()">Cancelar</button>
+        <button type="button" class="capture" (click)="takePhoto()">Capturar</button>
       </div>
     </div>
   }

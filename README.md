@@ -16,7 +16,7 @@
 - Automatic preview (blob URLs via `URL.createObjectURL`)
 - Drag & drop with visual feedback
 - Paste images from the clipboard (Ctrl + V)
-- Camera capture (`getUserMedia`)
+- Camera capture (`getUserMedia`) — front/rear switch, pinch zoom + slider, flash (torch) when supported
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
 - EXIF orientation correction (rotated phone photos display correctly)
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
@@ -227,10 +227,11 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 - ✅ Image reordering (drag & drop on desktop + long-press touch reorder)
 - ✅ Touch targets ≥ 44px on thumbnails, actions and remove buttons
 - ✅ Responsive layout — fluid thumbnail grid and action buttons adapt to small screens
+- ✅ Camera: switch front/rear, zoom (slider + pinch) and flash (torch)
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
-- Camera: switch front/rear, zoom and flash
+_Complete — all mobile items shipped._
 
 **2. Accessibility (WCAG 2.2)**
 
