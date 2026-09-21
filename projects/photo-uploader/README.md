@@ -23,7 +23,7 @@
 
 ## Requirements
 
-- Angular 16+
+- Angular 19.2.20+
 
 ## Installation
 
