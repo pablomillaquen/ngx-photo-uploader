@@ -649,4 +649,177 @@ describe('PhotoUploaderComponent', () => {
       expect(component.isTouchDragging).toBe(false);
     });
   });
+
+  describe('accessibility (WCAG 2.2)', () => {
+    const dispatchKey = (el: Element, key: string) => {
+      const evt = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      el.dispatchEvent(evt);
+      return evt;
+    };
+
+    const zone = () => fixture.nativeElement.querySelector('.upload-container') as HTMLElement;
+    const thumbs = () =>
+      Array.from(fixture.nativeElement.querySelectorAll('.thumbnail')) as HTMLElement[];
+
+    it('exposes the drop zone as a button with a described hint', () => {
+      const el = zone();
+      expect(el.getAttribute('role')).toBe('button');
+      expect(el.getAttribute('tabindex')).toBe('0');
+
+      const hintId = el.getAttribute('aria-describedby');
+      expect(hintId).toBeTruthy();
+      const hint = fixture.nativeElement.querySelector('#' + hintId) as HTMLElement;
+      expect(hint).toBeTruthy();
+      expect(hint.textContent).toContain('Enter');
+    });
+
+    it('marks the drop zone disabled when the control is disabled', () => {
+      component.setDisabledState(true);
+      fixture.detectChanges();
+
+      const el = zone();
+      expect(el.getAttribute('tabindex')).toBe('-1');
+      expect(el.getAttribute('aria-disabled')).toBe('true');
+    });
+
+    it('opens the file picker with Enter and Space', () => {
+      const spy = spyOn(component, 'openFilePicker');
+
+      dispatchKey(zone(), 'Enter');
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      const space = dispatchKey(zone(), ' ');
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(space.defaultPrevented).toBe(true);
+    });
+
+    it('ignores keyboard activation when disabled', () => {
+      const spy = spyOn(component, 'openFilePicker');
+      component.setDisabledState(true);
+      fixture.detectChanges();
+
+      dispatchKey(zone(), 'Enter');
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('renders thumbnails as a labelled list of focusable items', () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+      fixture.detectChanges();
+
+      const list = fixture.nativeElement.querySelector('.thumbnails');
+      expect(list.getAttribute('role')).toBe('list');
+      expect(list.getAttribute('aria-label')).toContain('2');
+
+      const items = thumbs();
+      expect(items.length).toBe(2);
+      items.forEach((item, i) => {
+        expect(item.getAttribute('role')).toBe('listitem');
+        expect(item.getAttribute('tabindex')).toBe('0');
+        expect(item.getAttribute('aria-label')).toContain(`Foto ${i + 1} de 2`);
+      });
+    });
+
+    it('reorders with arrow keys, announces the move and keeps focus', async () => {
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      const c = imageFile('c.png');
+      component.onFilesSelected(selectionEvent([a, b, c]));
+      fixture.detectChanges();
+
+      dispatchKey(thumbs()[0], 'ArrowRight');
+      fixture.detectChanges();
+
+      expect(component.selectedPhotos).toEqual([b, a, c]);
+      await wait(20);
+      expect(component.announcement).toContain('posición 2 de 3');
+      expect(document.activeElement).toBe(thumbs()[1]);
+    });
+
+    it('jumps to first and last with Home and End', () => {
+      component.onFilesSelected(
+        selectionEvent([imageFile('a.png'), imageFile('b.png'), imageFile('c.png')])
+      );
+      fixture.detectChanges();
+
+      dispatchKey(thumbs()[2], 'Home');
+      expect(component.selectedPhotos.map((f) => f.name)).toEqual(['c.png', 'a.png', 'b.png']);
+
+      dispatchKey(thumbs()[0], 'End');
+      expect(component.selectedPhotos.map((f) => f.name)).toEqual(['a.png', 'b.png', 'c.png']);
+    });
+
+    it('ignores reordering keys when disabled', () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+      component.setDisabledState(true);
+      fixture.detectChanges();
+
+      dispatchKey(thumbs()[0], 'ArrowRight');
+
+      expect(component.selectedPhotos.map((f) => f.name)).toEqual(['a.png', 'b.png']);
+    });
+
+    it('announces additions through the live region', async () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png')]));
+      await wait(20);
+
+      expect(component.announcement).toContain('Foto añadida');
+      const live = fixture.nativeElement.querySelector('[role="status"]');
+      expect(live.getAttribute('aria-live')).toBe('polite');
+      fixture.detectChanges();
+      expect(live.textContent).toContain('Foto añadida');
+    });
+
+    it('announces removal and moves focus to the next thumbnail', async () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('.thumbnail .remove') as HTMLElement).click();
+      fixture.detectChanges();
+      await wait(20);
+
+      expect(component.selectedPhotos.length).toBe(1);
+      expect(component.announcement).toContain('Foto eliminada');
+      expect(document.activeElement).toBe(thumbs()[0]);
+    });
+
+    it('moves focus back to the drop zone when the last photo is removed', async () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png')]));
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('.thumbnail .remove') as HTMLElement).click();
+      fixture.detectChanges();
+      await wait(20);
+
+      expect(document.activeElement).toBe(zone());
+    });
+
+    it('announces clearing all photos', async () => {
+      component.onFilesSelected(selectionEvent([imageFile('a.png')]));
+      component.clearPhotos();
+      await wait(20);
+
+      expect(component.announcement).toContain('Todas las fotos eliminadas');
+    });
+
+    it('stops the stream and revokes blob urls on destroy', () => {
+      const track = { stop: jasmine.createSpy('stop') };
+      component.videoStream = { getTracks: () => [track] } as unknown as MediaStream;
+      component.isCameraOpen = true;
+      component.onFilesSelected(selectionEvent([imageFile('a.png')]));
+      const url = component.thumbnails[0];
+      spyOn(URL, 'revokeObjectURL');
+
+      fixture.destroy();
+
+      expect(track.stop).toHaveBeenCalled();
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith(url);
+    });
+
+    it('assigns a unique hint id per instance', () => {
+      const other = TestBed.createComponent(PhotoUploaderComponent);
+      expect(component.hintId).not.toBe(other.componentInstance.hintId);
+      other.destroy();
+    });
+  });
 });

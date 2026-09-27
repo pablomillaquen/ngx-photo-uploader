@@ -204,10 +204,17 @@ this.form = this.fb.group({
 ## Accessibility & states
 
 - Automatic disabled state with Forms
-- Visual invalid state (red border) via `NgControl`
-- Aria-labels on thumbnails (`Imagen N`), remove buttons (`Eliminar foto N`) and upload icon (decorative, `aria-hidden`)
+- Visual invalid state (red border + `aria-invalid`) via `NgControl`
+- Focusable drop zone (`role="button"`, `tabindex`) — opens the file picker with `Enter` / `Space` and includes a screen-reader hint (`aria-describedby`)
+- Keyboard drag-reorder: focus a thumbnail and move it with `←` `→` / `Home` / `End`
+- Focus management: focus moves to the next thumbnail (or the drop zone) after removing/clearing photos, and to the capture/camera-toggle buttons when the camera opens/closes
+- ARIA live region (`role="status"`, `aria-live="polite"`) announcing additions, removals, reorder moves and camera state
+- Semantic thumbnail list (`role="list"` / `role="listitem"`) with aria-labels (`Foto N de M`, `Eliminar foto N`) and decorative icons (`aria-hidden`)
 - Native `<button>` elements for camera, capture/cancel and clear actions — keyboard accessible
+- Visible focus indicators (`:focus-visible`) on the drop zone, thumbnails and all buttons
 - Touch targets ≥ 44×44px (WCAG 2.2 target size) on drag handle, remove buttons and action buttons
+- Color contrast meets WCAG 2.2 AA (borders, placeholder text and action labels)
+- `prefers-reduced-motion: reduce` disables transitions
 
 ## Development
 
@@ -228,6 +235,7 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 - ✅ Touch targets ≥ 44px on thumbnails, actions and remove buttons
 - ✅ Responsive layout — fluid thumbnail grid and action buttons adapt to small screens
 - ✅ Camera: switch front/rear, zoom (slider + pinch) and flash (torch)
+- ✅ Accessibility (WCAG 2.2): keyboard drop zone, keyboard reorder, focus management, live region, contrast, reduced motion
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -235,12 +243,14 @@ _Complete — all mobile items shipped._
 
 **2. Accessibility (WCAG 2.2)**
 
-- Accessible file picker (focusable drop zone, `role="button"` + keyboard)
-- Keyboard drag-reorder (arrow keys / reorder buttons)
-- Focus management and visible focus indicators
-- ARIA live regions for upload feedback
-- Sufficient color contrast (WCAG 2.2 AA)
-- `prefers-reduced-motion` support
+_Complete — all accessibility items shipped._
+
+- ✅ Accessible file picker (focusable drop zone, `role="button"` + keyboard)
+- ✅ Keyboard drag-reorder (arrow keys / `Home` / `End`)
+- ✅ Focus management and visible focus indicators
+- ✅ ARIA live regions for upload feedback
+- ✅ Sufficient color contrast (WCAG 2.2 AA)
+- ✅ `prefers-reduced-motion` support
 
 **3. Visual & image features** (leverage Angular's strengths for image preview)
 

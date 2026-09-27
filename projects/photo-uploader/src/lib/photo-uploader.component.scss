@@ -1,13 +1,25 @@
 $touch-target: 44px;
 
 .photo-uploader {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .upload-container {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     width: 100%;
-    border: 2px dashed #ccc;
+    border: 2px dashed #949494;
     border-radius: 10px;
     cursor: pointer;
     transition: border-color 0.2s, background-color 0.2s;
@@ -16,6 +28,11 @@ $touch-target: 44px;
     &.dragging {
       border-color: #3f51b5;
       background-color: rgba(63, 81, 181, 0.05);
+    }
+
+    &:focus-visible {
+      outline: 2px solid #3f51b5;
+      outline-offset: 3px;
     }
 
     &.invalid {
@@ -30,12 +47,12 @@ $touch-target: 44px;
     .upload-icon {
       width: 48px;
       height: 48px;
-      color: #888;
+      color: #666;
     }
 
     .upload-placeholder {
       text-align: center;
-      color: #888;
+      color: #666;
     }
   }
 
@@ -58,6 +75,12 @@ $touch-target: 44px;
       aspect-ratio: 1;
       cursor: grab;
 
+      &:focus-visible {
+        outline: 2px solid #3f51b5;
+        outline-offset: 2px;
+        border-radius: 5px;
+      }
+
       &.dragging {
         opacity: 0.4;
       }
@@ -67,7 +90,7 @@ $touch-target: 44px;
         height: 100%;
         object-fit: cover;
         border-radius: 5px;
-        border: 1px solid #ccc;
+        border: 1px solid #949494;
         display: block;
       }
 
@@ -131,15 +154,20 @@ $touch-target: 44px;
         align-items: center;
         justify-content: center;
         background: white;
-        border: 1px solid #ccc;
+        border: 1px solid #949494;
         border-radius: 50%;
         cursor: pointer;
-        color: #f44336;
+        color: #c62828;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 
         svg {
           width: 18px;
           height: 18px;
+        }
+
+        &:focus-visible {
+          outline: 2px solid #3f51b5;
+          outline-offset: 2px;
         }
 
         &[disabled] {
@@ -191,6 +219,11 @@ $touch-target: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+
+      &:focus-visible {
+        outline: 2px solid #1a237e;
+        outline-offset: 2px;
+      }
     }
 
     .clear {
@@ -284,6 +317,11 @@ $touch-target: 44px;
         width: 22px;
         height: 22px;
       }
+
+      &:focus-visible {
+        outline: 2px solid #ffffff;
+        outline-offset: 2px;
+      }
     }
 
     .camera-zoom {
@@ -319,6 +357,11 @@ $touch-target: 44px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+
+        &:focus-visible {
+          outline: 2px solid #1a237e;
+          outline-offset: 2px;
+        }
       }
 
       .capture {
@@ -329,15 +372,19 @@ $touch-target: 44px;
         &:hover {
           background: #303f9f;
         }
+
+        &:focus-visible {
+          outline-color: #ffffff;
+        }
       }
 
       .cancel {
-        border: 1px solid #f44336;
+        border: 1px solid #c62828;
         background: transparent;
-        color: #f44336;
+        color: #c62828;
 
         &:hover {
-          background: rgba(244, 67, 54, 0.08);
+          background: rgba(198, 40, 40, 0.08);
         }
       }
     }
@@ -362,6 +409,18 @@ $touch-target: 44px;
     .actions,
     .camera-actions {
       gap: 8px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-uploader {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
     }
   }
 }

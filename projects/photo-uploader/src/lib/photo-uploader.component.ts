@@ -4,6 +4,7 @@ import {
   HostListener,
   Input,
   NgZone,
+  OnDestroy,
   Optional,
   Self,
   ViewChild
@@ -17,7 +18,7 @@ import { ControlValueAccessor, NgControl } from '@angular/forms';
   templateUrl: './photo-uploader.component.html',
   styleUrl: './photo-uploader.component.scss'
 })
-export class PhotoUploaderComponent implements ControlValueAccessor {
+export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @Input() multiple = true;
   @Input() accept = 'image/*';
   @Input() maxFiles?: number;
@@ -34,6 +35,10 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
 
   @ViewChild('video') videoElement?: ElementRef<HTMLVideoElement>;
   @ViewChild('thumbnailsEl') thumbnailsEl?: ElementRef<HTMLDivElement>;
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('uploadContainer') uploadContainer?: ElementRef<HTMLDivElement>;
+  @ViewChild('cameraToggle') cameraToggle?: ElementRef<HTMLButtonElement>;
+  @ViewChild('captureButton') captureButton?: ElementRef<HTMLButtonElement>;
 
   thumbnails: string[] = [];
   selectedPhotos: File[] = [];
@@ -57,6 +62,11 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   private touchTimer: ReturnType<typeof setTimeout> | undefined;
   private touchStartX = 0;
   private touchStartY = 0;
+
+  private static instanceCounter = 0;
+  readonly hintId = `ngx-photo-uploader-hint-${++PhotoUploaderComponent.instanceCounter}`;
+  announcement = '';
+  private destroyed = false;
 
   onChange: (value: File[]) => void = () => {};
   onTouched: () => void = () => {};
@@ -91,6 +101,79 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
 
   setDisabledState(isDisabled: boolean): void {
     this.isDisabled = isDisabled;
+  }
+
+  // ---------- Accesibilidad (WCAG 2.2) ----------
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.clearTouchTimer();
+    this.thumbnails.forEach((url) => URL.revokeObjectURL(url));
+    this.closeCamera();
+  }
+
+  openFilePicker(): void {
+    if (this.isDisabled) {
+      return;
+    }
+    this.fileInput?.nativeElement.click();
+  }
+
+  onUploadKeydown(event: KeyboardEvent): void {
+    if (this.isDisabled) {
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      this.openFilePicker();
+    }
+  }
+
+  onThumbnailKeydown(event: KeyboardEvent, index: number): void {
+    if (this.isDisabled) {
+      return;
+    }
+    let to = -1;
+    if (event.key === 'ArrowLeft') {
+      to = index - 1;
+    } else if (event.key === 'ArrowRight') {
+      to = index + 1;
+    } else if (event.key === 'Home') {
+      to = 0;
+    } else if (event.key === 'End') {
+      to = this.thumbnails.length - 1;
+    } else {
+      return;
+    }
+    if (to < 0 || to >= this.thumbnails.length || to === index) {
+      return;
+    }
+    event.preventDefault();
+    this.applyMove(index, to);
+    this.announce(`Foto movida a la posición ${to + 1} de ${this.thumbnails.length}`);
+    setTimeout(() => this.focusThumbnail(to));
+  }
+
+  private announce(text: string): void {
+    this.announcement = '';
+    setTimeout(() => {
+      if (!this.destroyed) {
+        this.announcement = text;
+      }
+    });
+  }
+
+  private focusThumbnail(index: number): void {
+    if (this.destroyed) {
+      return;
+    }
+    const thumbs = this.thumbnailsEl?.nativeElement?.querySelectorAll<HTMLElement>('.thumbnail');
+    const target = thumbs?.[index];
+    if (target) {
+      target.focus();
+    } else {
+      this.uploadContainer?.nativeElement.focus();
+    }
   }
 
   // ---------- Selección de archivos ----------
@@ -171,7 +254,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   }
 
   removePhoto(index: number): void {
-    if (this.isDisabled) {
+    if (this.isDisabled || index < 0 || index >= this.thumbnails.length) {
       return;
     }
     const url = this.thumbnails[index];
@@ -181,6 +264,20 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     this.thumbnails.splice(index, 1);
     this.selectedPhotos.splice(index, 1);
     this.notifyForm();
+    const total = this.selectedPhotos.length;
+    this.announce(
+      total === 0 ? 'Todas las fotos eliminadas' : `Foto eliminada. Total: ${total} fotos`
+    );
+    setTimeout(() => {
+      if (this.destroyed) {
+        return;
+      }
+      if (total > 0) {
+        this.focusThumbnail(Math.min(index, total - 1));
+      } else {
+        this.uploadContainer?.nativeElement.focus();
+      }
+    });
   }
 
   onDragStart(event: DragEvent, index: number): void {
@@ -327,6 +424,12 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
     this.clearThumbnails();
     this.selectedPhotos = [];
     this.notifyForm();
+    this.announce('Todas las fotos eliminadas');
+    setTimeout(() => {
+      if (!this.destroyed) {
+        this.uploadContainer?.nativeElement.focus();
+      }
+    });
   }
 
   private async processFiles(files: File[]): Promise<void> {
@@ -360,6 +463,12 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
       this.selectedPhotos.push(file);
     });
     this.notifyForm();
+    const total = this.selectedPhotos.length;
+    this.announce(
+      files.length === 1
+        ? `Foto añadida. Total: ${total} fotos`
+        : `Se añadieron ${files.length} fotos. Total: ${total} fotos`
+    );
   }
 
   private isCompressionEnabled(): boolean {
@@ -555,16 +664,21 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing }
       });
-      this.closeCamera();
+      this.stopStream();
       this.videoStream = stream;
       this.cameraFacing = facing;
       this.isCameraOpen = true;
       this.cameraZoom = 1;
       this.setupCameraCapabilities();
+      this.announce('Cámara abierta');
       setTimeout(() => {
+        if (this.destroyed) {
+          return;
+        }
         if (this.videoElement) {
           this.videoElement.nativeElement.srcObject = this.videoStream!;
         }
+        this.captureButton?.nativeElement.focus();
       });
     } catch (err) {
       console.error('No se pudo acceder a la cámara', err);
@@ -713,8 +827,21 @@ export class PhotoUploaderComponent implements ControlValueAccessor {
   }
 
   closeCamera(): void {
+    const wasOpen = this.isCameraOpen;
+    this.stopStream();
+    this.isCameraOpen = false;
+    if (wasOpen) {
+      this.announce('Cámara cerrada');
+      setTimeout(() => {
+        if (!this.destroyed) {
+          this.cameraToggle?.nativeElement.focus();
+        }
+      });
+    }
+  }
+
+  private stopStream(): void {
     this.videoStream?.getTracks().forEach((track) => track.stop());
     this.videoStream = undefined;
-    this.isCameraOpen = false;
   }
 }

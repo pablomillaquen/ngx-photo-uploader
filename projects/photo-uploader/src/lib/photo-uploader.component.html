@@ -1,12 +1,19 @@
 <div class="photo-uploader">
   <div
+    #uploadContainer
     class="upload-container"
+    role="button"
+    [attr.tabindex]="isDisabled ? -1 : 0"
+    [attr.aria-disabled]="isDisabled ? 'true' : null"
+    [attr.aria-describedby]="hintId"
+    [attr.aria-invalid]="ngControl?.invalid && ngControl?.touched ? 'true' : null"
     [class.dragging]="isDragging"
     [class.disabled]="isDisabled"
     [class.invalid]="ngControl?.invalid && ngControl?.touched"
     [style.height]="height"
     [style.borderRadius.px]="rounded"
-    (click)="!isDisabled && fileInput.click()"
+    (click)="!isDisabled && openFilePicker()"
+    (keydown)="onUploadKeydown($event)"
     (dragover)="onDragOver($event)"
     (dragleave)="onDragLeave($event)"
     (drop)="onDrop($event)"
@@ -33,39 +40,51 @@
         />
       </svg>
       <div class="upload-placeholder">
-        <p>{{ placeholder }}</p>
+        <p aria-hidden="true">{{ placeholder }}</p>
       </div>
     }
+
+    <span class="sr-only" [id]="hintId">
+      Zona de carga de fotos. Presiona Enter o espacio para elegir archivos, o arrastra imágenes
+      aquí.
+    </span>
   </div>
 
   @if (thumbnails.length) {
     <div
       class="thumbnails"
       #thumbnailsEl
+      role="list"
+      [attr.aria-label]="'Fotos seleccionadas: ' + thumbnails.length"
       [style.--uploader-gap.px]="gap"
       [style.--thumb-size.px]="thumbnailSize"
     >
       @for (thumbnail of thumbnails; track $index) {
         <div
           class="thumbnail"
+          role="listitem"
+          tabindex="0"
           [class.dragging]="dragIndex === $index"
           [class.touch-dragging]="touchDragIndex === $index"
           [class.insert-target]="isTouchDragging && touchDragIndex !== null && touchInsertIndex === $index"
           [attr.draggable]="isTouchDevice ? 'false' : 'true'"
+          [attr.aria-disabled]="isDisabled ? 'true' : null"
+          [attr.aria-label]="
+            'Foto ' + ($index + 1) + ' de ' + thumbnails.length + '. Usa las flechas para reordenar'
+          "
           (dragstart)="onDragStart($event, $index)"
           (dragover)="onThumbDragOver($event)"
           (drop)="onThumbDrop($event, $index)"
           (dragend)="onDragEnd()"
-          [attr.aria-label]="'Imagen ' + ($index + 1)"
+          (keydown)="onThumbnailKeydown($event, $index)"
         >
-          <img [src]="thumbnail" [alt]="'Preview ' + ($index + 1)" />
+          <img [src]="thumbnail" [alt]="'Vista previa de la foto ' + ($index + 1)" />
           <svg
             class="drag-handle"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
             aria-hidden="true"
-            title="Arrastrar para reordenar"
             (touchstart)="onTouchStart($event, $index)"
             (touchmove)="onTouchMove($event)"
             (touchend)="onTouchEnd()"
@@ -121,7 +140,13 @@
     }
 
     @if (!isCameraOpen) {
-      <button type="button" class="camera-toggle" [disabled]="isDisabled" (click)="openCamera()">
+      <button
+        #cameraToggle
+        type="button"
+        class="camera-toggle"
+        [disabled]="isDisabled"
+        (click)="openCamera()"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -138,7 +163,7 @@
   </div>
 
   @if (isCameraOpen) {
-    <div class="camera">
+    <div class="camera" role="region" aria-label="Cámara">
       <div
         class="camera-viewport"
         (touchstart)="onCameraTouchStart($event)"
@@ -212,8 +237,20 @@
       </div>
       <div class="camera-actions">
         <button type="button" class="cancel" (click)="closeCamera()">Cancelar</button>
-        <button type="button" class="capture" (click)="takePhoto()">Capturar</button>
+        <button
+          #captureButton
+          type="button"
+          class="capture"
+          (click)="takePhoto()"
+          (keydown.escape)="closeCamera()"
+        >
+          Capturar
+        </button>
       </div>
     </div>
   }
+
+  <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+    {{ announcement }}
+  </div>
 </div>
