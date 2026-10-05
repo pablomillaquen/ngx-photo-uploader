@@ -32,6 +32,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @Input() gap = 10;
   @Input() rounded = 10;
   @Input() placeholder = 'Click o arrastra para cargar fotos';
+  @Input() showBadges = true;
 
   @ViewChild('video') videoElement?: ElementRef<HTMLVideoElement>;
   @ViewChild('thumbnailsEl') thumbnailsEl?: ElementRef<HTMLDivElement>;
@@ -41,6 +42,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @ViewChild('captureButton') captureButton?: ElementRef<HTMLButtonElement>;
 
   thumbnails: string[] = [];
+  thumbMeta: ({ width: number; height: number } | null)[] = [];
   selectedPhotos: File[] = [];
 
   isDragging = false;
@@ -86,8 +88,10 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     this.clearThumbnails();
     this.selectedPhotos = files ?? [];
 
-    this.selectedPhotos.forEach((file) => {
+    this.selectedPhotos.forEach((file, index) => {
       this.thumbnails.push(URL.createObjectURL(file));
+      this.thumbMeta.push(null);
+      this.queueDimsLoad(index);
     });
   }
 
@@ -176,6 +180,63 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     }
   }
 
+  // ---------- Badges de miniatura ----------
+
+  badgeText(index: number): string | null {
+    if (!this.showBadges) {
+      return null;
+    }
+    const meta = this.thumbMeta[index];
+    const file = this.selectedPhotos[index];
+    if (!meta || !file) {
+      return null;
+    }
+    return `${meta.width}\u00d7${meta.height} \u00b7 ${this.formatSize(file.size)}`;
+  }
+
+  thumbLabel(index: number): string {
+    const meta = this.thumbMeta[index];
+    const file = this.selectedPhotos[index];
+    let label = `Foto ${index + 1} de ${this.thumbnails.length}`;
+    if (meta && file) {
+      label += `, ${meta.width}\u00d7${meta.height}, ${this.formatSize(file.size)}`;
+    }
+    return label + '. Usa las flechas para reordenar';
+  }
+
+  formatSize(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  private queueDimsLoad(index: number): void {
+    const url = this.thumbnails[index];
+    if (!url) {
+      return;
+    }
+    this.readImageDims(url).then((dims) => {
+      this.ngZone.run(() => {
+        if (dims && this.thumbnails[index] === url) {
+          this.thumbMeta[index] = dims;
+        }
+      });
+    });
+  }
+
+  private readImageDims(url: string): Promise<{ width: number; height: number } | null> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
   // ---------- Selección de archivos ----------
 
   onFilesSelected(event: Event): void {
@@ -262,6 +323,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
       URL.revokeObjectURL(url);
     }
     this.thumbnails.splice(index, 1);
+    this.thumbMeta.splice(index, 1);
     this.selectedPhotos.splice(index, 1);
     this.notifyForm();
     const total = this.selectedPhotos.length;
@@ -318,6 +380,8 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     }
     const [thumbnail] = this.thumbnails.splice(from, 1);
     this.thumbnails.splice(to, 0, thumbnail);
+    const [meta] = this.thumbMeta.splice(from, 1);
+    this.thumbMeta.splice(to, 0, meta);
     const [photo] = this.selectedPhotos.splice(from, 1);
     this.selectedPhotos.splice(to, 0, photo);
     this.notifyForm();
@@ -458,8 +522,10 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   }
 
   private addPhotos(files: File[]): void {
+    const startIndex = this.thumbnails.length;
     files.forEach((file) => {
       this.thumbnails.push(URL.createObjectURL(file));
+      this.thumbMeta.push(null);
       this.selectedPhotos.push(file);
     });
     this.notifyForm();
@@ -469,6 +535,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
         ? `Foto añadida. Total: ${total} fotos`
         : `Se añadieron ${files.length} fotos. Total: ${total} fotos`
     );
+    files.forEach((_, i) => this.queueDimsLoad(startIndex + i));
   }
 
   private isCompressionEnabled(): boolean {
@@ -634,6 +701,7 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   private clearThumbnails(): void {
     this.thumbnails.forEach((url) => URL.revokeObjectURL(url));
     this.thumbnails = [];
+    this.thumbMeta = [];
   }
 
   private notifyForm(): void {

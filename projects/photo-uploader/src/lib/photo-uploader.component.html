@@ -69,9 +69,7 @@
           [class.insert-target]="isTouchDragging && touchDragIndex !== null && touchInsertIndex === $index"
           [attr.draggable]="isTouchDevice ? 'false' : 'true'"
           [attr.aria-disabled]="isDisabled ? 'true' : null"
-          [attr.aria-label]="
-            'Foto ' + ($index + 1) + ' de ' + thumbnails.length + '. Usa las flechas para reordenar'
-          "
+          [attr.aria-label]="thumbLabel($index)"
           (dragstart)="onDragStart($event, $index)"
           (dragover)="onThumbDragOver($event)"
           (drop)="onThumbDrop($event, $index)"
@@ -79,6 +77,9 @@
           (keydown)="onThumbnailKeydown($event, $index)"
         >
           <img [src]="thumbnail" [alt]="'Vista previa de la foto ' + ($index + 1)" />
+          @if (badgeText($index); as text) {
+            <span class="badge" aria-hidden="true">{{ text }}</span>
+          }
           <svg
             class="drag-handle"
             xmlns="http://www.w3.org/2000/svg"

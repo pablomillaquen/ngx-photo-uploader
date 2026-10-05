@@ -822,4 +822,87 @@ describe('PhotoUploaderComponent', () => {
       other.destroy();
     });
   });
+
+  describe('thumbnail badges', () => {
+    const dragEvent = {
+      dataTransfer: { setData: () => undefined, effectAllowed: 'none', dropEffect: 'none' },
+      preventDefault: () => undefined
+    } as unknown as DragEvent;
+
+    it('loads dimensions and renders the badge text', async () => {
+      const file = await makeImageFile(320, 240);
+      component.onFilesSelected(selectionEvent([file]));
+      await wait(100);
+
+      expect(component.thumbMeta[0]).toEqual({ width: 320, height: 240 });
+      expect(component.badgeText(0)).toBe(`320×240 · ${component.formatSize(file.size)}`);
+
+      fixture.detectChanges();
+      const badge = fixture.nativeElement.querySelector('.thumbnail .badge');
+      expect(badge).toBeTruthy();
+      expect(badge.textContent).toContain('320×240');
+      expect(badge.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('hides badges when showBadges is false', async () => {
+      component.showBadges = false;
+      const file = await makeImageFile(100, 50);
+      component.onFilesSelected(selectionEvent([file]));
+      await wait(100);
+      fixture.detectChanges();
+
+      expect(component.badgeText(0)).toBeNull();
+      expect(fixture.nativeElement.querySelector('.thumbnail .badge')).toBeNull();
+    });
+
+    it('formats file sizes', () => {
+      expect(component.formatSize(0)).toBe('0 B');
+      expect(component.formatSize(512)).toBe('512 B');
+      expect(component.formatSize(2048)).toBe('2.0 KB');
+      expect(component.formatSize(3 * 1024 * 1024)).toBe('3.0 MB');
+    });
+
+    it('includes dimensions and size in the thumbnail aria-label', async () => {
+      const file = await makeImageFile(320, 240);
+      component.onFilesSelected(selectionEvent([file]));
+      await wait(100);
+      fixture.detectChanges();
+
+      const label = fixture.nativeElement.querySelector('.thumbnail').getAttribute('aria-label');
+      expect(label).toContain('Foto 1 de 1');
+      expect(label).toContain('320×240');
+      expect(label).toContain(component.formatSize(file.size));
+    });
+
+    it('keeps badge metadata aligned on reorder and removal', async () => {
+      const a = await makeImageFile(100, 80);
+      const b = await makeImageFile(200, 60);
+      component.onFilesSelected(selectionEvent([a, b]));
+      await wait(100);
+
+      component.onDragStart(dragEvent, 0);
+      component.onThumbDrop(dragEvent, 1);
+      expect(component.thumbMeta).toEqual([
+        { width: 200, height: 60 },
+        { width: 100, height: 80 }
+      ]);
+
+      component.removePhoto(0);
+      expect(component.thumbnails.length).toBe(1);
+      expect(component.selectedPhotos.length).toBe(1);
+      expect(component.thumbMeta).toEqual([{ width: 100, height: 80 }]);
+      expect(component.badgeText(0)).toBe(`100×80 · ${component.formatSize(a.size)}`);
+    });
+
+    it('fills metadata on writeValue and clears it with the photos', async () => {
+      const file = await makeImageFile(64, 64);
+      component.writeValue([file]);
+      await wait(100);
+      expect(component.thumbMeta[0]).toEqual({ width: 64, height: 64 });
+
+      component.clearPhotos();
+      expect(component.thumbMeta).toEqual([]);
+      expect(component.thumbnails).toEqual([]);
+    });
+  });
 });

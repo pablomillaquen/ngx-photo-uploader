@@ -14,6 +14,7 @@
 - EXIF orientation correction (rotated phone photos display correctly)
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
 - Responsive thumbnail grid — fluid, square thumbnails that adapt to any screen size
+- Thumbnail badges showing dimensions and file size (toggle with `showBadges`)
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -80,6 +81,7 @@ The control value is always `File[]`, ready for `FormData`, REST APIs, or multip
 | `gap`           | `number` | `10`               | Space between thumbnails (px) |
 | `rounded`       | `number` | `10`               | Corner radius (px)          |
 | `placeholder`   | `string` | Default text       | Placeholder text            |
+| `showBadges`    | `boolean` | `true`            | Show dimensions/size badges on thumbnails |
 
 ### Example
 
@@ -221,6 +223,7 @@ this.form = this.fb.group({
 - ✅ Responsive layout — fluid thumbnail grid and action buttons adapt to small screens
 - ✅ Camera: switch front/rear, zoom (slider + pinch) and flash (torch)
 - ✅ Accessibility (WCAG 2.2): keyboard drop zone, keyboard reorder, focus management, live region, contrast, reduced motion
+- ✅ Thumbnail badges (dimensions + file size) with `showBadges` toggle
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
