@@ -78,7 +78,9 @@
         >
           <img [src]="thumbnail" [alt]="'Vista previa de la foto ' + ($index + 1)" />
           @if (badgeText($index); as text) {
-            <span class="badge" aria-hidden="true">{{ text }}</span>
+            <span class="badge" [style.right.px]="enableCropping ? 44 : 4" aria-hidden="true">{{
+              text
+            }}</span>
           }
           <svg
             class="drag-handle"
@@ -116,6 +118,29 @@
               />
             </svg>
           </button>
+          @if (enableCropping) {
+            <button
+              type="button"
+              class="crop"
+              [disabled]="isDisabled"
+              [attr.aria-label]="'Recortar foto ' + ($index + 1)"
+              (click)="openCrop($index)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M6.13 1 6 16a2 2 0 0 0 2 2h15" />
+                <path d="M1 6.13 16 6a2 2 0 0 1 2 2v15" />
+              </svg>
+            </button>
+          }
         </div>
       }
     </div>
@@ -247,6 +272,79 @@
         >
           Capturar
         </button>
+      </div>
+    </div>
+  }
+
+  @if (cropOpen) {
+    <div class="crop-overlay" (click)="closeCrop()">
+      <div
+        class="crop-dialog"
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="cropTitleId"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="crop-header">
+          <h2 [id]="cropTitleId">Recortar foto</h2>
+        </div>
+        <div
+          #cropStage
+          class="crop-stage"
+          tabindex="0"
+          [attr.aria-describedby]="cropHintId"
+          [class.panning]="cropPanning"
+          (keydown)="onCropKeydown($event)"
+          (pointerdown)="onCropPointerDown($event)"
+          (pointermove)="onCropPointerMove($event)"
+          (pointerup)="onCropPointerUp()"
+          (pointercancel)="onCropPointerUp()"
+        >
+          <img
+            #cropImg
+            [src]="cropUrl"
+            alt="Vista previa de la foto a recortar"
+            draggable="false"
+            [style.width.px]="cropDisplayW"
+            [style.height.px]="cropDisplayH"
+            [style.left.px]="cropFrameX + cropOffsetX"
+            [style.top.px]="cropFrameY + cropOffsetY"
+            (load)="onCropImageLoad($event)"
+            (error)="onCropImageError()"
+          />
+          <div
+            class="crop-frame"
+            [style.width.px]="cropFrameW"
+            [style.height.px]="cropFrameH"
+            [style.left.px]="cropFrameX"
+            [style.top.px]="cropFrameY"
+          ></div>
+          <span class="sr-only" [id]="cropHintId">
+            Arrastra o usa las flechas para mover la imagen dentro del marco. Usa más y menos para
+            hacer zoom, y Escape para cancelar.
+          </span>
+        </div>
+        <div class="crop-controls">
+          <input
+            type="range"
+            class="crop-zoom"
+            min="1"
+            max="4"
+            step="0.05"
+            [value]="cropZoom"
+            aria-label="Zoom de la imagen"
+            (input)="setCropZoomFromEvent($event)"
+          />
+          <button
+            type="button"
+            class="crop-apply"
+            [disabled]="cropLoading"
+            (click)="applyCrop()"
+          >
+            Recortar
+          </button>
+          <button type="button" class="crop-cancel" (click)="closeCrop()">Cancelar</button>
+        </div>
       </div>
     </div>
   }

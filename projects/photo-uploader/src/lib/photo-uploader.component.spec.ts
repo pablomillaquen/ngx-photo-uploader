@@ -905,4 +905,196 @@ describe('PhotoUploaderComponent', () => {
       expect(component.thumbnails).toEqual([]);
     });
   });
+
+  describe('cropping', () => {
+    const waitUntil = async (condition: () => boolean, timeout = 3000) => {
+      const start = Date.now();
+      while (!condition() && Date.now() - start < timeout) {
+        await wait(20);
+      }
+    };
+
+    const mockStage = (width: number, height: number) => {
+      const stage = fixture.nativeElement.querySelector('.crop-stage') as HTMLElement;
+      spyOn(stage, 'getBoundingClientRect').and.returnValue({
+        width,
+        height,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      } as unknown as DOMRect);
+    };
+
+    const setupCrop = async (
+      file: File,
+      opts: {
+        aspect?: 'free' | '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
+        stageW?: number;
+        stageH?: number;
+      } = {}
+    ) => {
+      component.enableCropping = true;
+      if (opts.aspect) {
+        component.cropAspect = opts.aspect;
+      }
+      component.onFilesSelected(selectionEvent([file]));
+      component.openCrop(0);
+      fixture.detectChanges();
+      mockStage(opts.stageW ?? 400, opts.stageH ?? 300);
+      await waitUntil(() => !component.cropLoading);
+    };
+
+    const dispatchKey = (el: Element, key: string, shiftKey = false) =>
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true })
+      );
+
+    it('hides the crop button when enableCropping is false', async () => {
+      const file = await makeImageFile(40, 30);
+      component.onFilesSelected(selectionEvent([file]));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.thumbnail .crop')).toBeNull();
+
+      component.enableCropping = true;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.thumbnail .crop')).toBeTruthy();
+    });
+
+    it('opens the dialog with ARIA attributes and moves focus to the stage', async () => {
+      component.enableCropping = true;
+      component.onFilesSelected(selectionEvent([await makeImageFile(60, 40)]));
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('.thumbnail .crop') as HTMLButtonElement;
+      expect(btn.getAttribute('aria-label')).toBe('Recortar foto 1');
+      btn.click();
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('.crop-dialog');
+      expect(dialog.getAttribute('role')).toBe('dialog');
+      expect(dialog.getAttribute('aria-modal')).toBe('true');
+      const title = fixture.nativeElement.querySelector('#' + dialog.getAttribute('aria-labelledby'));
+      expect(title).toBeTruthy();
+      expect(title.textContent).toContain('Recortar foto');
+
+      await wait(20);
+      expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.crop-stage'));
+    });
+
+    it('does not open the crop dialog when disabled', async () => {
+      component.enableCropping = true;
+      component.onFilesSelected(selectionEvent([await makeImageFile(40, 30)]));
+      component.setDisabledState(true);
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('.thumbnail .crop') as HTMLButtonElement;
+      expect(btn.disabled).toBe(true);
+
+      component.openCrop(0);
+      expect(component.cropOpen).toBe(false);
+    });
+
+    it('computes a centered frame for a fixed aspect ratio', async () => {
+      await setupCrop(await makeImageFile(400, 300), { aspect: '1:1' });
+
+      expect(component.cropFrameW).toBe(300);
+      expect(component.cropFrameH).toBe(300);
+      expect(component.cropFrameX).toBe(50);
+      expect(component.cropFrameY).toBe(0);
+      expect(component.cropBaseScale).toBe(1);
+      expect(component.cropOffsetX).toBe(-50);
+      expect(component.cropOffsetY).toBe(0);
+    });
+
+    it('uses the full stage with the free aspect ratio', async () => {
+      await setupCrop(await makeImageFile(800, 600));
+
+      expect(component.cropFrameW).toBe(400);
+      expect(component.cropFrameH).toBe(300);
+      expect(component.cropOffsetX).toBe(0);
+      expect(component.cropOffsetY).toBe(0);
+      expect(component.cropBaseScale).toBe(0.5);
+    });
+
+    it('pans with arrow keys and clamps zoom offsets', async () => {
+      await setupCrop(await makeImageFile(400, 300), { aspect: '1:1' });
+      const stage = fixture.nativeElement.querySelector('.crop-stage') as HTMLElement;
+
+      dispatchKey(stage, 'ArrowLeft');
+      expect(component.cropOffsetX).toBe(-66);
+      dispatchKey(stage, 'ArrowLeft', true);
+      expect(component.cropOffsetX).toBe(-67);
+
+      component.setCropZoom(2);
+      expect(component.cropOffsetX).toBe(-67);
+      dispatchKey(stage, 'ArrowUp');
+      expect(component.cropOffsetY).toBe(-16);
+
+      component.cropOffsetX = 500;
+      component.cropOffsetY = -5000;
+      component.setCropZoom(4);
+      expect(component.cropOffsetX).toBe(0);
+      expect(component.cropOffsetY).toBe(component.cropFrameH - component.cropDisplayH);
+    });
+
+    it('crops to the selected frame and notifies the form', async () => {
+      const file = await makeImageFile(400, 300);
+      await setupCrop(file, { aspect: '1:1' });
+      const oldUrl = component.thumbnails[0];
+
+      component.applyCrop();
+      await waitUntil(() => !component.cropOpen);
+      await wait(200);
+
+      expect(component.thumbnails[0]).not.toBe(oldUrl);
+      expect(component.thumbnails[0]).toMatch(/^blob:/);
+      const cropped = component.selectedPhotos[0];
+      expect(cropped.type).toBe('image/png');
+      expect(cropped.name).toBe(file.name);
+      const dims = await imageDims(component.thumbnails[0]);
+      expect(dims.width).toBe(300);
+      expect(dims.height).toBe(300);
+      expect(onChangeSpy).toHaveBeenCalledWith([cropped]);
+      expect(component.thumbMeta[0]).toEqual({ width: 300, height: 300 });
+      expect(component.announcement).toContain('Foto recortada');
+    });
+
+    it('crops the zoomed region with the free aspect ratio', async () => {
+      await setupCrop(await makeImageFile(800, 600));
+      component.setCropZoom(2);
+
+      component.applyCrop();
+      await waitUntil(() => !component.cropOpen);
+
+      const dims = await imageDims(component.thumbnails[0]);
+      expect(dims.width).toBe(400);
+      expect(dims.height).toBe(300);
+    });
+
+    it('closes the dialog on Escape and restores focus to the crop button', async () => {
+      await setupCrop(await makeImageFile(60, 40));
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+      expect(component.cropOpen).toBe(false);
+      await wait(20);
+      expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.thumbnail .crop'));
+    });
+
+    it('closes and announces an error when the image cannot be loaded', async () => {
+      await setupCrop(await makeImageFile(60, 40));
+
+      const img = fixture.nativeElement.querySelector('.crop-stage img') as HTMLImageElement;
+      img.dispatchEvent(new Event('error'));
+
+      expect(component.cropOpen).toBe(false);
+      await wait(20);
+      expect(component.announcement).toContain('No se pudo recortar');
+    });
+  });
 });

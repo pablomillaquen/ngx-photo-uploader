@@ -15,6 +15,7 @@
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
 - Responsive thumbnail grid — fluid, square thumbnails that adapt to any screen size
 - Thumbnail badges showing dimensions and file size (toggle with `showBadges`)
+- Crop tool (toggle with `enableCropping`) — pan, zoom and aspect-ratio frames (`1:1`, `4:3`, `3:4`, `16:9`, `9:16` or free)
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -82,6 +83,8 @@ The control value is always `File[]`, ready for `FormData`, REST APIs, or multip
 | `rounded`       | `number` | `10`               | Corner radius (px)          |
 | `placeholder`   | `string` | Default text       | Placeholder text            |
 | `showBadges`    | `boolean` | `true`            | Show dimensions/size badges on thumbnails |
+| `enableCropping` | `boolean` | `false`          | Show the crop button on each thumbnail |
+| `cropAspect`    | `'free' \| '1:1' \| '4:3' \| '3:4' \| '16:9' \| '9:16'` | `free` | Crop frame aspect ratio |
 
 ### Example
 
@@ -152,6 +155,21 @@ The emitted `File[]` follows the new order, so the images are uploaded in the or
 - Only the order changes — files are **not** re-encoded on reorder.
 - Works with `Reactive Forms`: the control value reflects the new order immediately.
 
+## Cropping
+
+Enable the crop button on every thumbnail with `enableCropping`:
+
+```html
+<photo-uploader formControlName="photos" [enableCropping]="true" cropAspect="1:1"></photo-uploader>
+```
+
+- A dialog opens with the image on a fixed stage and a frame in the configured aspect ratio (`cropAspect`, default `free` = full stage).
+- **Pan**: drag with the mouse/finger, or use the arrow keys (`Shift` for 1px precision).
+- **Zoom**: slider or `+` / `-` keys (1×–4×). Offsets are clamped so the frame is always covered.
+- **Apply**: the selected region is re-encoded at source resolution (`quality`, JPEG/PNG/WebP preserved) and replaces the thumbnail — the form emits the new `File[]` immediately.
+- **Cancel**: `Escape`, the backdrop or the "Cancelar" button close the dialog and focus returns to the crop button.
+- The dialog is fully accessible (`role="dialog"`, `aria-modal`, labelled title, sr-only instructions, live-region announcements).
+
 ## Bundled validators
 
 The library exports reusable validators:
@@ -208,6 +226,7 @@ this.form = this.fb.group({
 - Native `<button>` elements for camera, capture/cancel and clear actions — keyboard accessible
 - Visible focus indicators (`:focus-visible`) on the drop zone, thumbnails and all buttons
 - Touch targets ≥ 44×44px (WCAG 2.2 target size) on drag handle, remove buttons and action buttons
+- Accessible crop dialog (`role="dialog"`, `aria-modal`, labelled title, keyboard pan/zoom, `Escape` to cancel, focus return to the crop button)
 - Color contrast meets WCAG 2.2 AA (borders, placeholder text and action labels)
 - `prefers-reduced-motion: reduce` disables transitions
 
@@ -224,6 +243,7 @@ this.form = this.fb.group({
 - ✅ Camera: switch front/rear, zoom (slider + pinch) and flash (torch)
 - ✅ Accessibility (WCAG 2.2): keyboard drop zone, keyboard reorder, focus management, live region, contrast, reduced motion
 - ✅ Thumbnail badges (dimensions + file size) with `showBadges` toggle
+- ✅ Cropping (aspect-ratio frames, pan/zoom, accessible dialog) with `enableCropping` + `cropAspect`
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -242,8 +262,6 @@ _Complete — all accessibility items shipped._
 
 **3. Visual & image features** (leverage Angular's strengths for image preview)
 
-- Cropping support
-- Thumbnail badges (dimensions, file size, processing status)
 - Custom placeholders and per-thumbnail actions via content projection (`ng-template`)
 
 **4. Processing & API**

@@ -194,6 +194,38 @@ $touch-target: 44px;
           cursor: not-allowed;
         }
       }
+
+      .crop {
+        position: absolute;
+        bottom: -8px;
+        right: -8px;
+        width: $touch-target;
+        height: $touch-target;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: 1px solid #949494;
+        border-radius: 50%;
+        cursor: pointer;
+        color: #3f51b5;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+        svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        &:focus-visible {
+          outline: 2px solid #3f51b5;
+          outline-offset: 2px;
+        }
+
+        &[disabled] {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+      }
     }
 
     .insert-target {
@@ -276,6 +308,139 @@ $touch-target: 44px;
     button[disabled] {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+  }
+
+  .crop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .crop-dialog {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    width: min(520px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+
+    .crop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+
+      h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+    }
+
+    .crop-stage {
+      position: relative;
+      height: 320px;
+      overflow: hidden;
+      background: #1b1b1b;
+      border-radius: 8px;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+
+      &.panning {
+        cursor: grabbing;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #3f51b5;
+        outline-offset: 2px;
+      }
+
+      img {
+        position: absolute;
+        max-width: none;
+        max-height: none;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      .crop-frame {
+        position: absolute;
+        box-sizing: border-box;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+      }
+    }
+
+    .crop-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+
+      .crop-zoom {
+        flex: 1 1 140px;
+        min-width: 140px;
+        height: 32px;
+        accent-color: #3f51b5;
+        cursor: pointer;
+      }
+
+      .crop-apply,
+      .crop-cancel {
+        min-height: $touch-target;
+        padding: 6px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        &:focus-visible {
+          outline: 2px solid #1a237e;
+          outline-offset: 2px;
+        }
+      }
+
+      .crop-apply {
+        border: none;
+        background: #3f51b5;
+        color: white;
+
+        &:hover {
+          background: #303f9f;
+        }
+
+        &:focus-visible {
+          outline-color: #ffffff;
+        }
+
+        &[disabled] {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+
+      .crop-cancel {
+        border: 1px solid #c62828;
+        background: transparent;
+        color: #c62828;
+
+        &:hover {
+          background: rgba(198, 40, 40, 0.08);
+        }
+      }
     }
   }
 
@@ -428,6 +593,10 @@ $touch-target: 44px;
     .actions,
     .camera-actions {
       gap: 8px;
+    }
+
+    .crop-dialog .crop-stage {
+      height: 240px;
     }
   }
 }

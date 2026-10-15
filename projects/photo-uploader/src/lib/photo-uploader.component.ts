@@ -33,6 +33,8 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @Input() rounded = 10;
   @Input() placeholder = 'Click o arrastra para cargar fotos';
   @Input() showBadges = true;
+  @Input() enableCropping = false;
+  @Input() cropAspect: 'free' | '1:1' | '4:3' | '3:4' | '16:9' | '9:16' = 'free';
 
   @ViewChild('video') videoElement?: ElementRef<HTMLVideoElement>;
   @ViewChild('thumbnailsEl') thumbnailsEl?: ElementRef<HTMLDivElement>;
@@ -40,6 +42,8 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @ViewChild('uploadContainer') uploadContainer?: ElementRef<HTMLDivElement>;
   @ViewChild('cameraToggle') cameraToggle?: ElementRef<HTMLButtonElement>;
   @ViewChild('captureButton') captureButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild('cropStage') cropStageEl?: ElementRef<HTMLDivElement>;
+  @ViewChild('cropImg') cropImgEl?: ElementRef<HTMLImageElement>;
 
   thumbnails: string[] = [];
   thumbMeta: ({ width: number; height: number } | null)[] = [];
@@ -67,6 +71,8 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
 
   private static instanceCounter = 0;
   readonly hintId = `ngx-photo-uploader-hint-${++PhotoUploaderComponent.instanceCounter}`;
+  readonly cropTitleId = `ngx-photo-uploader-crop-title-${PhotoUploaderComponent.instanceCounter}`;
+  readonly cropHintId = `ngx-photo-uploader-crop-hint-${PhotoUploaderComponent.instanceCounter}`;
   announcement = '';
   private destroyed = false;
 
@@ -235,6 +241,335 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
       img.onerror = () => resolve(null);
       img.src = url;
     });
+  }
+
+  // ---------- Recorte de imágenes ----------
+
+  private static readonly cropStageDefaultW = 480;
+  private static readonly cropStageDefaultH = 320;
+
+  cropOpen = false;
+  cropIndex = -1;
+  cropUrl = '';
+  cropLoading = false;
+  cropZoom = 1;
+  cropOffsetX = 0;
+  cropOffsetY = 0;
+  cropNaturalW = 0;
+  cropNaturalH = 0;
+  cropFrameX = 0;
+  cropFrameY = 0;
+  cropFrameW = 0;
+  cropFrameH = 0;
+  cropPanning = false;
+  private cropPanStartX = 0;
+  private cropPanStartY = 0;
+  private cropPanStartOffsetX = 0;
+  private cropPanStartOffsetY = 0;
+
+  get cropBaseScale(): number {
+    if (!this.cropNaturalW || !this.cropNaturalH || !this.cropFrameW || !this.cropFrameH) {
+      return 1;
+    }
+    return Math.max(this.cropFrameW / this.cropNaturalW, this.cropFrameH / this.cropNaturalH);
+  }
+
+  get cropDisplayScale(): number {
+    return this.cropBaseScale * this.cropZoom;
+  }
+
+  get cropDisplayW(): number {
+    return this.cropNaturalW * this.cropDisplayScale;
+  }
+
+  get cropDisplayH(): number {
+    return this.cropNaturalH * this.cropDisplayScale;
+  }
+
+  openCrop(index: number): void {
+    if (this.isDisabled || !this.enableCropping || this.cropOpen) {
+      return;
+    }
+    const url = this.thumbnails[index];
+    if (!url) {
+      return;
+    }
+    this.cropIndex = index;
+    this.cropUrl = url;
+    this.cropOpen = true;
+    this.cropLoading = true;
+    this.cropZoom = 1;
+    this.cropOffsetX = 0;
+    this.cropOffsetY = 0;
+    this.cropNaturalW = 0;
+    this.cropNaturalH = 0;
+    this.cropFrameX = 0;
+    this.cropFrameY = 0;
+    this.cropFrameW = 0;
+    this.cropFrameH = 0;
+    setTimeout(() => {
+      if (!this.destroyed) {
+        this.cropStageEl?.nativeElement.focus();
+      }
+    });
+  }
+
+  closeCrop(): void {
+    if (!this.cropOpen) {
+      return;
+    }
+    const index = this.cropIndex;
+    this.cropOpen = false;
+    this.cropIndex = -1;
+    this.cropUrl = '';
+    this.cropLoading = false;
+    this.cropZoom = 1;
+    this.cropOffsetX = 0;
+    this.cropOffsetY = 0;
+    this.cropNaturalW = 0;
+    this.cropNaturalH = 0;
+    this.cropFrameX = 0;
+    this.cropFrameY = 0;
+    this.cropFrameW = 0;
+    this.cropFrameH = 0;
+    this.cropPanning = false;
+    setTimeout(() => {
+      if (this.destroyed) {
+        return;
+      }
+      const thumb = this.thumbnailsEl?.nativeElement.children[index] as HTMLElement | undefined;
+      const cropButton = thumb?.querySelector<HTMLButtonElement>('.crop');
+      if (cropButton && !cropButton.disabled) {
+        cropButton.focus();
+      } else {
+        this.uploadContainer?.nativeElement.focus();
+      }
+    });
+  }
+
+  @HostListener('document:keydown.escape')
+  onDocumentEscape(): void {
+    if (this.cropOpen) {
+      this.closeCrop();
+    }
+  }
+
+  onCropImageLoad(event: Event): void {
+    if (!this.cropOpen) {
+      return;
+    }
+    const img = event.target as HTMLImageElement;
+    const naturalW = img.naturalWidth;
+    const naturalH = img.naturalHeight;
+    if (!naturalW || !naturalH) {
+      this.onCropImageError();
+      return;
+    }
+    const rect = this.cropStageEl?.nativeElement.getBoundingClientRect();
+    const stageW = Math.round(rect?.width || 0) || PhotoUploaderComponent.cropStageDefaultW;
+    const stageH = Math.round(rect?.height || 0) || PhotoUploaderComponent.cropStageDefaultH;
+    this.cropNaturalW = naturalW;
+    this.cropNaturalH = naturalH;
+    const ratio = this.cropAspectRatio();
+    if (!ratio) {
+      this.cropFrameX = 0;
+      this.cropFrameY = 0;
+      this.cropFrameW = stageW;
+      this.cropFrameH = stageH;
+    } else {
+      const scale = Math.min(stageW / ratio.w, stageH / ratio.h);
+      this.cropFrameW = Math.round(ratio.w * scale);
+      this.cropFrameH = Math.round(ratio.h * scale);
+      this.cropFrameX = Math.round((stageW - this.cropFrameW) / 2);
+      this.cropFrameY = Math.round((stageH - this.cropFrameH) / 2);
+    }
+    this.cropZoom = 1;
+    this.cropOffsetX = (this.cropFrameW - this.cropDisplayW) / 2;
+    this.cropOffsetY = (this.cropFrameH - this.cropDisplayH) / 2;
+    this.clampCropOffset();
+    this.cropLoading = false;
+  }
+
+  onCropImageError(): void {
+    if (!this.cropOpen) {
+      return;
+    }
+    this.announce('No se pudo recortar la foto');
+    this.closeCrop();
+  }
+
+  private cropAspectRatio(): { w: number; h: number } | null {
+    switch (this.cropAspect) {
+      case '1:1':
+        return { w: 1, h: 1 };
+      case '4:3':
+        return { w: 4, h: 3 };
+      case '3:4':
+        return { w: 3, h: 4 };
+      case '16:9':
+        return { w: 16, h: 9 };
+      case '9:16':
+        return { w: 9, h: 16 };
+      default:
+        return null;
+    }
+  }
+
+  private clampCropOffset(): void {
+    if (!this.cropDisplayW || !this.cropDisplayH) {
+      this.cropOffsetX = 0;
+      this.cropOffsetY = 0;
+      return;
+    }
+    this.cropOffsetX = Math.min(
+      Math.max(this.cropOffsetX, this.cropFrameW - this.cropDisplayW),
+      0
+    );
+    this.cropOffsetY = Math.min(
+      Math.max(this.cropOffsetY, this.cropFrameH - this.cropDisplayH),
+      0
+    );
+  }
+
+  setCropZoom(zoom: number): void {
+    this.cropZoom = Math.min(Math.max(zoom, 1), 4);
+    this.clampCropOffset();
+  }
+
+  setCropZoomFromEvent(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.setCropZoom(Number.isFinite(value) ? value : 1);
+  }
+
+  onCropKeydown(event: KeyboardEvent): void {
+    if (!this.cropOpen || this.cropLoading) {
+      return;
+    }
+    const step = event.shiftKey ? 1 : 16;
+    let dx = 0;
+    let dy = 0;
+    switch (event.key) {
+      case 'ArrowLeft':
+        dx = -step;
+        break;
+      case 'ArrowRight':
+        dx = step;
+        break;
+      case 'ArrowUp':
+        dy = -step;
+        break;
+      case 'ArrowDown':
+        dy = step;
+        break;
+      case '+':
+      case '=':
+        event.preventDefault();
+        this.setCropZoom(this.cropZoom + 0.1);
+        return;
+      case '-':
+      case '_':
+        event.preventDefault();
+        this.setCropZoom(this.cropZoom - 0.1);
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.cropOffsetX += dx;
+    this.cropOffsetY += dy;
+    this.clampCropOffset();
+  }
+
+  onCropPointerDown(event: PointerEvent): void {
+    if (!this.cropOpen || this.cropLoading) {
+      return;
+    }
+    this.cropPanning = true;
+    this.cropPanStartX = event.clientX;
+    this.cropPanStartY = event.clientY;
+    this.cropPanStartOffsetX = this.cropOffsetX;
+    this.cropPanStartOffsetY = this.cropOffsetY;
+    const stage = this.cropStageEl?.nativeElement;
+    if (
+      stage &&
+      typeof event.pointerId === 'number' &&
+      typeof stage.setPointerCapture === 'function'
+    ) {
+      try {
+        stage.setPointerCapture(event.pointerId);
+      } catch {
+      }
+    }
+  }
+
+  onCropPointerMove(event: PointerEvent): void {
+    if (!this.cropPanning) {
+      return;
+    }
+    this.cropOffsetX = this.cropPanStartOffsetX + (event.clientX - this.cropPanStartX);
+    this.cropOffsetY = this.cropPanStartOffsetY + (event.clientY - this.cropPanStartY);
+    this.clampCropOffset();
+  }
+
+  onCropPointerUp(): void {
+    this.cropPanning = false;
+  }
+
+  applyCrop(): void {
+    if (!this.cropOpen || this.cropLoading || this.cropIndex < 0) {
+      return;
+    }
+    const img = this.cropImgEl?.nativeElement;
+    const index = this.cropIndex;
+    const file = this.selectedPhotos[index];
+    const scale = this.cropDisplayScale;
+    if (!img || !file || !img.naturalWidth || !this.cropFrameW || !this.cropFrameH || !scale) {
+      return;
+    }
+    const sx = -this.cropOffsetX / scale;
+    const sy = -this.cropOffsetY / scale;
+    const sw = this.cropFrameW / scale;
+    const sh = this.cropFrameH / scale;
+    const outW = Math.max(1, Math.round(sw));
+    const outH = Math.max(1, Math.round(sh));
+    const canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+    const mime = /^image\/(jpeg|png|webp)$/.test(file.type) ? file.type : 'image/jpeg';
+    this.cropLoading = true;
+    canvas.toBlob(
+      (blob) => {
+        this.ngZone.run(() => {
+          if (this.destroyed) {
+            return;
+          }
+          this.cropLoading = false;
+          if (!blob) {
+            this.announce('No se pudo recortar la foto');
+            return;
+          }
+          const cropped = new File([blob], file.name, { type: mime });
+          const oldUrl = this.thumbnails[index];
+          this.closeCrop();
+          if (oldUrl) {
+            URL.revokeObjectURL(oldUrl);
+          }
+          this.thumbnails[index] = URL.createObjectURL(cropped);
+          this.thumbMeta[index] = null;
+          this.selectedPhotos[index] = cropped;
+          this.notifyForm();
+          this.queueDimsLoad(index);
+          this.announce('Foto recortada');
+        });
+      },
+      mime,
+      this.quality
+    );
   }
 
   // ---------- Selección de archivos ----------
