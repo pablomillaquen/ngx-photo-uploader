@@ -1,5 +1,6 @@
 import {
   Component,
+  ContentChild,
   ElementRef,
   HostListener,
   Input,
@@ -7,14 +8,49 @@ import {
   OnDestroy,
   Optional,
   Self,
+  TemplateRef,
   ViewChild
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ControlValueAccessor, NgControl } from '@angular/forms';
+
+/**
+ * Context of a custom `#placeholder` template projected into the empty drop zone.
+ */
+export interface PhotoUploaderPlaceholderContext {
+  /** Value of the `placeholder` input, in case the custom template wants to reuse it. */
+  placeholder: string;
+}
+
+/**
+ * Context of a custom `#thumbActions` template rendered on every thumbnail.
+ *
+ * ```html
+ * <ng-template #thumbActions let-file let-index="index" let-total="total"
+ *              let-disabled="disabled" let-remove="remove" let-crop="crop">
+ *   <button type="button" (click)="remove()">Delete</button>
+ * </ng-template>
+ * ```
+ */
+export interface PhotoUploaderThumbActionsContext {
+  /** The `File` behind this thumbnail (default alias: `let-file`). */
+  $implicit: File;
+  /** Zero-based position of the photo (alias: `let-index="index"`). */
+  index: number;
+  /** Total number of photos (alias: `let-total="total"`). */
+  total: number;
+  /** Whether the control is currently disabled (alias: `let-disabled="disabled"`). */
+  disabled: boolean;
+  /** Removes this photo — same behaviour as the built-in remove button (alias: `let-remove="remove"`). */
+  remove: () => void;
+  /** Opens the crop dialog for this photo (alias: `let-crop="crop"`). */
+  crop: () => void;
+}
 
 @Component({
   selector: 'photo-uploader',
   standalone: true,
-  imports: [],
+  imports: [NgTemplateOutlet],
   templateUrl: './photo-uploader.component.html',
   styleUrl: './photo-uploader.component.scss'
 })
@@ -44,6 +80,14 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @ViewChild('captureButton') captureButton?: ElementRef<HTMLButtonElement>;
   @ViewChild('cropStage') cropStageEl?: ElementRef<HTMLDivElement>;
   @ViewChild('cropImg') cropImgEl?: ElementRef<HTMLImageElement>;
+
+  /** Custom empty-state content (`<ng-template #placeholder>`). */
+  @ContentChild('placeholder', { descendants: true })
+  placeholderTemplate?: TemplateRef<PhotoUploaderPlaceholderContext>;
+
+  /** Custom per-thumbnail actions (`<ng-template #thumbActions>`). */
+  @ContentChild('thumbActions', { descendants: true })
+  thumbActionsTemplate?: TemplateRef<PhotoUploaderThumbActionsContext>;
 
   thumbnails: string[] = [];
   thumbMeta: ({ width: number; height: number } | null)[] = [];
@@ -140,7 +184,9 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   }
 
   onThumbnailKeydown(event: KeyboardEvent, index: number): void {
-    if (this.isDisabled) {
+    if (this.isDisabled || event.target !== event.currentTarget) {
+      // Keys pressed inside interactive content (built-in buttons or projected
+      // `#thumbActions`) belong to that element, not to the reorder handler.
       return;
     }
     let to = -1;
@@ -218,6 +264,25 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
       return `${(bytes / 1024).toFixed(1)} KB`;
     }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  // ---------- Content projection (ng-template) ----------
+
+  /** Context passed to a custom `#placeholder` template. */
+  get placeholderCtx(): PhotoUploaderPlaceholderContext {
+    return { placeholder: this.placeholder };
+  }
+
+  /** Context passed to a custom `#thumbActions` template for the thumbnail at `index`. */
+  thumbActionContext(index: number): PhotoUploaderThumbActionsContext {
+    return {
+      $implicit: this.selectedPhotos[index],
+      index,
+      total: this.thumbnails.length,
+      disabled: this.isDisabled,
+      remove: () => this.removePhoto(index),
+      crop: () => this.openCrop(index)
+    };
   }
 
   private queueDimsLoad(index: number): void {

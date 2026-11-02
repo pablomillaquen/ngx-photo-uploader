@@ -226,6 +226,29 @@ $touch-target: 44px;
           cursor: not-allowed;
         }
       }
+
+      .thumb-actions {
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 2px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 2;
+      }
+
+      &.has-actions .badge {
+        bottom: var(--thumb-actions-height, 34px);
+      }
+
+      &.has-actions.has-crop .thumb-actions {
+        right: 40px;
+      }
     }
 
     .insert-target {

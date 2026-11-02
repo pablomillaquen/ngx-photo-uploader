@@ -1,7 +1,37 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ElementRef } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 
 import { PhotoUploaderComponent } from './photo-uploader.component';
+
+@Component({
+  selector: 'pu-projection-host',
+  standalone: true,
+  imports: [PhotoUploaderComponent],
+  template: `
+    <photo-uploader [enableCropping]="enableCropping">
+      <ng-template #placeholder let-ph="placeholder">
+        <p class="custom-placeholder">{{ ph }}</p>
+      </ng-template>
+      <ng-template
+        #thumbActions
+        let-file
+        let-i="index"
+        let-total="total"
+        let-disabled="disabled"
+        let-remove="remove"
+        let-crop="crop"
+      >
+        <span class="custom-ctx">{{ i }}/{{ total }} {{ file.name }} {{ disabled }}</span>
+        <button type="button" class="custom-remove" (click)="remove()">Quitar</button>
+        <button type="button" class="custom-crop" (click)="crop()">Recortar</button>
+      </ng-template>
+    </photo-uploader>
+  `
+})
+class PuProjectionHostComponent {
+  @ViewChild(PhotoUploaderComponent) uploader!: PhotoUploaderComponent;
+  enableCropping = false;
+}
 
 describe('PhotoUploaderComponent', () => {
   let component: PhotoUploaderComponent;
@@ -1096,5 +1126,116 @@ describe('PhotoUploaderComponent', () => {
       await wait(20);
       expect(component.announcement).toContain('No se pudo recortar');
     });
+  });
+});
+
+describe('PhotoUploaderComponent — content projection (ng-template)', () => {
+  let fixture: ComponentFixture<PuProjectionHostComponent>;
+  let host: PuProjectionHostComponent;
+  let uploader: PhotoUploaderComponent;
+
+  const imageFile = (name: string, size = 10) =>
+    new File([new Uint8Array(size)], name, { type: 'image/png' });
+
+  const selectionEvent = (files: File[]) =>
+    ({ target: { files } }) as unknown as Event;
+
+  const dispatchKey = (el: Element, key: string) => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  };
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [PuProjectionHostComponent, PhotoUploaderComponent]
+    })
+    .compileComponents();
+
+    fixture = TestBed.createComponent(PuProjectionHostComponent);
+    host = fixture.componentInstance;
+    fixture.detectChanges();
+    uploader = host.uploader;
+  });
+
+  it('projects a custom #placeholder template and hides the default one', () => {
+    const custom = fixture.nativeElement.querySelector('.custom-placeholder') as HTMLElement;
+    expect(custom).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.upload-icon')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.upload-placeholder')).toBeNull();
+  });
+
+  it('exposes the placeholder input through the template context', () => {
+    uploader.placeholder = 'Suelta aquí';
+    fixture.detectChanges();
+
+    const custom = fixture.nativeElement.querySelector('.custom-placeholder') as HTMLElement;
+    expect(custom.textContent).toContain('Suelta aquí');
+  });
+
+  it('renders the default placeholder when no template is projected', () => {
+    const plain = TestBed.createComponent(PhotoUploaderComponent);
+    plain.detectChanges();
+
+    const el = plain.nativeElement.querySelector('.upload-placeholder') as HTMLElement;
+    expect(el).toBeTruthy();
+    expect(el.textContent).toContain('Click o arrastra');
+    expect(plain.nativeElement.querySelector('.custom-placeholder')).toBeNull();
+  });
+
+  it('projects #thumbActions on every thumbnail with its context', () => {
+    uploader.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+    fixture.detectChanges();
+
+    const actions = fixture.nativeElement.querySelectorAll('.thumb-actions');
+    expect(actions.length).toBe(2);
+
+    const ctx = fixture.nativeElement.querySelector('.custom-ctx') as HTMLElement;
+    expect(ctx.textContent).toContain('0/2 a.png');
+    expect(ctx.textContent).toContain('false');
+
+    const second = fixture.nativeElement.querySelectorAll('.custom-ctx')[1] as HTMLElement;
+    expect(second.textContent).toContain('1/2 b.png');
+  });
+
+  it('removes the photo through the remove() exposed in the context', () => {
+    uploader.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.custom-remove') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(uploader.selectedPhotos.map((f) => f.name)).toEqual(['b.png']);
+    expect(fixture.nativeElement.querySelectorAll('.thumb-actions').length).toBe(1);
+  });
+
+  it('opens the crop dialog through the crop() exposed in the context', () => {
+    host.enableCropping = true;
+    uploader.onFilesSelected(selectionEvent([imageFile('a.png')]));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.custom-crop') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(uploader.cropOpen).toBe(true);
+    uploader.closeCrop();
+  });
+
+  it('reflects the disabled state in the context', () => {
+    uploader.onFilesSelected(selectionEvent([imageFile('a.png')]));
+    uploader.setDisabledState(true);
+    fixture.detectChanges();
+
+    const ctx = fixture.nativeElement.querySelector('.custom-ctx') as HTMLElement;
+    expect(ctx.textContent).toContain('true');
+  });
+
+  it('does not reorder with arrow keys when focus is inside the projected actions', () => {
+    uploader.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+    fixture.detectChanges();
+
+    const btn = fixture.nativeElement.querySelector('.custom-remove') as HTMLElement;
+    dispatchKey(btn, 'ArrowRight');
+    fixture.detectChanges();
+
+    expect(uploader.selectedPhotos.map((f) => f.name)).toEqual(['a.png', 'b.png']);
   });
 });

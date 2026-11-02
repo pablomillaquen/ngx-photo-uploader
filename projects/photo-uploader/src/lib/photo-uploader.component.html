@@ -28,20 +28,26 @@
     />
 
     @if (!thumbnails.length) {
-      <svg
-        class="upload-icon"
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          d="M21.025 5h-3.6L15.6 3.25c-.4-.325-.9-.5-1.4-.5H9.8c-.5 0-1 .175-1.4.5L6.575 5h-3.6C1.875 5 1 5.875 1 7v11.5c0 1.125.875 2 2 2h18c1.125 0 2-.875 2-2V7c0-1.125-.875-2-2-2ZM12 18.1c-2.6 0-4.7-2.1-4.7-4.7s2.1-4.7 4.7-4.7 4.7 2.1 4.7 4.7-2.1 4.7-4.7 4.7Z"
-        />
-      </svg>
-      <div class="upload-placeholder">
-        <p aria-hidden="true">{{ placeholder }}</p>
-      </div>
+      @if (placeholderTemplate) {
+        <ng-container
+          *ngTemplateOutlet="placeholderTemplate; context: placeholderCtx"
+        ></ng-container>
+      } @else {
+        <svg
+          class="upload-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            d="M21.025 5h-3.6L15.6 3.25c-.4-.325-.9-.5-1.4-.5H9.8c-.5 0-1 .175-1.4.5L6.575 5h-3.6C1.875 5 1 5.875 1 7v11.5c0 1.125.875 2 2 2h18c1.125 0 2-.875 2-2V7c0-1.125-.875-2-2-2ZM12 18.1c-2.6 0-4.7-2.1-4.7-4.7s2.1-4.7 4.7-4.7 4.7 2.1 4.7 4.7-2.1 4.7-4.7 4.7Z"
+          />
+        </svg>
+        <div class="upload-placeholder">
+          <p aria-hidden="true">{{ placeholder }}</p>
+        </div>
+      }
     }
 
     <span class="sr-only" [id]="hintId">
@@ -67,6 +73,8 @@
           [class.dragging]="dragIndex === $index"
           [class.touch-dragging]="touchDragIndex === $index"
           [class.insert-target]="isTouchDragging && touchDragIndex !== null && touchInsertIndex === $index"
+          [class.has-actions]="!!thumbActionsTemplate"
+          [class.has-crop]="enableCropping"
           [attr.draggable]="isTouchDevice ? 'false' : 'true'"
           [attr.aria-disabled]="isDisabled ? 'true' : null"
           [attr.aria-label]="thumbLabel($index)"
@@ -140,6 +148,13 @@
                 <path d="M1 6.13 16 6a2 2 0 0 1 2 2v15" />
               </svg>
             </button>
+          }
+          @if (thumbActionsTemplate) {
+            <div class="thumb-actions">
+              <ng-container
+                *ngTemplateOutlet="thumbActionsTemplate; context: thumbActionContext($index)"
+              ></ng-container>
+            </div>
           }
         </div>
       }

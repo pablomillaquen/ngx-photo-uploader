@@ -16,6 +16,7 @@
 - Responsive thumbnail grid — fluid, square thumbnails that adapt to any screen size
 - Thumbnail badges showing dimensions and file size (toggle with `showBadges`)
 - Crop tool (toggle with `enableCropping`) — pan, zoom and aspect-ratio frames (`1:1`, `4:3`, `3:4`, `16:9`, `9:16` or free)
+- Custom empty state and per-thumbnail actions via content projection (`ng-template` `#placeholder` / `#thumbActions`)
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -170,6 +171,59 @@ Enable the crop button on every thumbnail with `enableCropping`:
 - **Cancel**: `Escape`, the backdrop or the "Cancelar" button close the dialog and focus returns to the crop button.
 - The dialog is fully accessible (`role="dialog"`, `aria-modal`, labelled title, sr-only instructions, live-region announcements).
 
+## Content projection
+
+Two optional `<ng-template>`s let you customise the empty state and add your own actions to every thumbnail.
+
+### Custom placeholder
+
+```html
+<photo-uploader formControlName="photos">
+  <ng-template #placeholder>
+    <div>Drop your job-site photos here</div>
+  </ng-template>
+</photo-uploader>
+```
+
+- Rendered instead of the default icon + `placeholder` text whenever there are no photos.
+- Context: `let-ph="placeholder"` exposes the current `placeholder` input value.
+
+### Per-thumbnail actions
+
+```html
+<photo-uploader formControlName="photos" [enableCropping]="true">
+  <ng-template
+    #thumbActions
+    let-file
+    let-index="index"
+    let-total="total"
+    let-disabled="disabled"
+    let-remove="remove"
+    let-crop="crop"
+  >
+    <button type="button" (click)="tag(file)">Tag</button>
+    <button type="button" (click)="remove()">Remove</button>
+  </ng-template>
+</photo-uploader>
+```
+
+The template is rendered inside every thumbnail as a bottom overlay (`.thumb-actions`):
+
+| Context                     | Type         | Description                                     |
+| --------------------------- | ------------ | ----------------------------------------------- |
+| `let-file`                  | `File`       | Photo behind the thumbnail (implicit context)   |
+| `let-index="index"`         | `number`     | Zero-based position of the photo                |
+| `let-total="total"`         | `number`     | Total number of photos                          |
+| `let-disabled="disabled"`   | `boolean`    | Whether the control is currently disabled       |
+| `let-remove="remove"`       | `() => void` | Removes the photo (same as the built-in button) |
+| `let-crop="crop"`           | `() => void` | Opens the crop dialog for the photo             |
+
+Notes:
+
+- The built-in remove/crop buttons keep rendering — your actions are added alongside them.
+- The badges move up while custom actions are shown; tune the offset with the `--thumb-actions-height` CSS custom property (default `34px`).
+- Arrow-key reordering is ignored while focus is inside your actions, so your buttons keep their own keyboard behaviour.
+
 ## Bundled validators
 
 The library exports reusable validators:
@@ -244,6 +298,7 @@ this.form = this.fb.group({
 - ✅ Accessibility (WCAG 2.2): keyboard drop zone, keyboard reorder, focus management, live region, contrast, reduced motion
 - ✅ Thumbnail badges (dimensions + file size) with `showBadges` toggle
 - ✅ Cropping (aspect-ratio frames, pan/zoom, accessible dialog) with `enableCropping` + `cropAspect`
+- ✅ Content projection — custom placeholder and per-thumbnail actions via `ng-template`
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -262,7 +317,7 @@ _Complete — all accessibility items shipped._
 
 **3. Visual & image features** (leverage Angular's strengths for image preview)
 
-- Custom placeholders and per-thumbnail actions via content projection (`ng-template`)
+_Complete — all visual items shipped._
 
 **4. Processing & API**
 
