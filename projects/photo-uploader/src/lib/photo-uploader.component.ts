@@ -897,12 +897,9 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   }
 
   private async processFiles(files: File[]): Promise<void> {
-    const accepted: File[] = [];
+    let accepted: File[] = [];
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
-        return;
-      }
-      if (this.maxFiles !== undefined && this.selectedPhotos.length + accepted.length >= this.maxFiles) {
         return;
       }
       accepted.push(file);
@@ -910,6 +907,12 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
 
     if (accepted.length === 0) {
       return;
+    }
+
+    if (this.maxFiles !== undefined && accepted.length > this.maxFiles) {
+      // The batch alone exceeds the limit: keep the first photos of the batch
+      // (consistent with auto-evicting the oldest selected photos).
+      accepted = accepted.slice(0, this.maxFiles);
     }
 
     if (!this.isCompressionEnabled()) {
@@ -922,6 +925,14 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   }
 
   private addPhotos(files: File[]): void {
+    let evicted = 0;
+    if (this.maxFiles !== undefined) {
+      const excess = this.selectedPhotos.length + files.length - this.maxFiles;
+      if (excess > 0) {
+        evicted = this.evictOldest(excess);
+      }
+    }
+
     const startIndex = this.thumbnails.length;
     files.forEach((file) => {
       this.thumbnails.push(URL.createObjectURL(file));
@@ -930,12 +941,30 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     });
     this.notifyForm();
     const total = this.selectedPhotos.length;
-    this.announce(
+    let message =
       files.length === 1
         ? `Foto añadida. Total: ${total} fotos`
-        : `Se añadieron ${files.length} fotos. Total: ${total} fotos`
-    );
+        : `Se añadieron ${files.length} fotos. Total: ${total} fotos`;
+    if (evicted > 0) {
+      message += `, ${evicted} ${evicted === 1 ? 'foto antigua eliminada' : 'fotos antiguas eliminadas'} por el límite de ${this.maxFiles}`;
+    }
+    this.announce(message);
     files.forEach((_, i) => this.queueDimsLoad(startIndex + i));
+  }
+
+  /** Removes the oldest photos (front of the list) until `count` slots are free. */
+  private evictOldest(count: number): number {
+    let removed = 0;
+    while (removed < count && this.selectedPhotos.length > 0) {
+      const url = this.thumbnails.shift();
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+      this.thumbMeta.shift();
+      this.selectedPhotos.shift();
+      removed++;
+    }
+    return removed;
   }
 
   private isCompressionEnabled(): boolean {

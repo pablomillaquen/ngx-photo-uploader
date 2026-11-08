@@ -174,6 +174,14 @@
   }
 
   <div class="actions">
+    @if (maxFiles !== undefined) {
+      <span
+        class="count"
+        [class.full]="thumbnails.length >= maxFiles"
+        [attr.aria-label]="thumbnails.length + ' de ' + maxFiles + ' fotos'"
+        >{{ thumbnails.length }}/{{ maxFiles }}</span
+      >
+    }
     @if (thumbnails.length) {
       <button type="button" class="clear" [disabled]="isDisabled" (click)="clearPhotos()">
         Limpiar todas las fotos

@@ -24,6 +24,7 @@
 - Thumbnail badges showing dimensions and file size (toggle with `showBadges`)
 - Crop tool (toggle with `enableCropping`) — pan, zoom and aspect-ratio frames (`1:1`, `4:3`, `3:4`, `16:9`, `9:16` or free)
 - Custom empty state and per-thumbnail actions via content projection (`ng-template` `#placeholder` / `#thumbActions`)
+- `maxFiles` counter ("3/5") with auto-eviction of the oldest photos
 - **Reactive Forms** integration (`ControlValueAccessor`)
 - Automatic disabled / enabled state with Forms
 - Visual invalid state (`NgControl`)
@@ -81,7 +82,7 @@ The control value is always `File[]`, ready for `FormData`, REST APIs, or multip
 | --------------- | ------- | ------------------ | --------------------------- |
 | `multiple`      | `boolean` | `true`           | Allow multiple photos       |
 | `accept`        | `string` | `image/*`          | Accepted file types         |
-| `maxFiles`      | `number` | *unlimited*        | Maximum number of photos    |
+| `maxFiles`      | `number` | *unlimited*        | Maximum number of photos — shows a "N/M" counter and auto-evicts the oldest |
 | `maxWidth`      | `number` | *unlimited*        | Max width in px (keeps aspect ratio) |
 | `maxHeight`     | `number` | *unlimited*        | Max height in px (keeps aspect ratio) |
 | `quality`       | `number` | `0.9`              | JPEG/WebP compression quality (0-1) |
@@ -177,6 +178,19 @@ Enable the crop button on every thumbnail with `enableCropping`:
 - **Apply**: the selected region is re-encoded at source resolution (`quality`, JPEG/PNG/WebP preserved) and replaces the thumbnail — the form emits the new `File[]` immediately.
 - **Cancel**: `Escape`, the backdrop or the "Cancelar" button close the dialog and focus returns to the crop button.
 - The dialog is fully accessible (`role="dialog"`, `aria-modal`, labelled title, sr-only instructions, live-region announcements).
+
+## Maximum number of photos
+
+Set `maxFiles` to cap how many photos the user can select:
+
+```html
+<photo-uploader formControlName="photos" [maxFiles]="5"></photo-uploader>
+```
+
+- A **"N/M" counter** is rendered in the actions bar (turns red once the limit is reached), with an accessible label such as `3 de 5 fotos`.
+- When new photos would exceed the limit, the **oldest photos are auto-evicted** (removed from the front of the list) so the newest ones always fit — the live region announces the eviction.
+- A single batch larger than `maxFiles` keeps the first photos of the batch.
+- The `photoMaxFiles` validator still flags the control as invalid when the limit is exceeded by other means (e.g. `writeValue`).
 
 ## Content projection
 
@@ -314,6 +328,7 @@ npm test        # runs the unit tests (requires Chrome/Chromium)
 - ✅ Thumbnail badges (dimensions + file size) with `showBadges` toggle
 - ✅ Cropping (aspect-ratio frames, pan/zoom, accessible dialog) with `enableCropping` + `cropAspect`
 - ✅ Content projection — custom placeholder and per-thumbnail actions via `ng-template`
+- ✅ `maxFiles` counter ("3/5") with auto-eviction of the oldest photos
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -342,7 +357,6 @@ _Complete — all visual items shipped._
 - Per-image metadata output (`{ file, original, dimension, compressionRatio, error }`) and granular events (`photoAdded`, `photoRemoved`, `reordered`, `ready`)
 - Per-format quality settings (`jpgQuality`, `pngCompression`) instead of a single `quality`
 - Cancellable processing (`AbortController`) with per-thumbnail error state and retry
-- `maxFiles` counter UX ("3/5") with auto-eviction of the oldest photo
 - SSR / hydration support verification
 
 **5. Distribution & quality**

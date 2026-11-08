@@ -168,6 +168,67 @@ describe('PhotoUploaderComponent', () => {
     expect(component.thumbnails.length).toBe(2);
   });
 
+  describe('maxFiles counter', () => {
+    const countEl = () => fixture.nativeElement.querySelector('.actions .count') as HTMLElement | null;
+
+    it('shows a counter only when maxFiles is set', () => {
+      expect(countEl()).toBeNull();
+
+      component.maxFiles = 3;
+      fixture.detectChanges();
+
+      const el = countEl();
+      expect(el).toBeTruthy();
+      expect(el!.textContent!.trim()).toBe('0/3');
+      expect(el!.getAttribute('aria-label')).toBe('0 de 3 fotos');
+    });
+
+    it('updates the counter as photos are added and removed', () => {
+      component.maxFiles = 2;
+      fixture.detectChanges();
+
+      component.onFilesSelected(selectionEvent([imageFile('a.png'), imageFile('b.png')]));
+      fixture.detectChanges();
+
+      expect(countEl()!.textContent!.trim()).toBe('2/2');
+      expect(countEl()!.classList.contains('full')).toBe(true);
+
+      component.removePhoto(0);
+      fixture.detectChanges();
+
+      expect(countEl()!.textContent!.trim()).toBe('1/2');
+      expect(countEl()!.classList.contains('full')).toBe(false);
+    });
+
+    it('auto-evicts the oldest photo when the limit is exceeded', () => {
+      component.maxFiles = 2;
+      const a = imageFile('a.png');
+      const b = imageFile('b.png');
+      const c = imageFile('c.png');
+
+      component.onFilesSelected(selectionEvent([a]));
+      component.onFilesSelected(selectionEvent([b]));
+      component.onFilesSelected(selectionEvent([c]));
+      fixture.detectChanges();
+
+      expect(component.selectedPhotos).toEqual([b, c]);
+      expect(component.thumbnails.length).toBe(2);
+      expect(onChangeSpy.calls.mostRecent().args[0]).toEqual([b, c]);
+      expect(countEl()!.textContent!.trim()).toBe('2/2');
+    });
+
+    it('announces the eviction in the live region', async () => {
+      component.maxFiles = 1;
+      component.onFilesSelected(selectionEvent([imageFile('a.png')]));
+      component.onFilesSelected(selectionEvent([imageFile('b.png')]));
+      await wait(20);
+      fixture.detectChanges();
+
+      expect(component.announcement).toContain('foto antigua eliminada');
+      expect(component.announcement).toContain('límite de 1');
+    });
+  });
+
   it('respects disabled state', () => {
     component.setDisabledState(true);
     const file = imageFile('a.png');
