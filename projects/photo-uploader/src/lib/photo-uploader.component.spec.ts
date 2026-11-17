@@ -477,6 +477,99 @@ describe('PhotoUploaderComponent', () => {
     });
   });
 
+  describe('HEIC/HEIF support', () => {
+    const heicFile = (name = 'IMG_0001.HEIC', type = 'image/heic') =>
+      new File([new Uint8Array(16)], name, { type });
+
+    const decodedJpeg = () =>
+      new File([new Uint8Array(8)], 'IMG_0001.jpg', { type: 'image/jpeg' });
+
+    it('detects HEIC files by MIME type and extension', () => {
+      const isHeic = (f: File) => (component as any).isHeicFile(f);
+
+      expect(isHeic(heicFile('a.heic', 'image/heic'))).toBe(true);
+      expect(isHeic(heicFile('a.heif', 'image/heif'))).toBe(true);
+      expect(isHeic(heicFile('a.heic', ''))).toBe(true);
+      expect(isHeic(heicFile('a.HEIC', 'image/heic-sequence'))).toBe(true);
+      expect(isHeic(imageFile('a.png'))).toBe(false);
+      expect(isHeic(new File(['x'], 'doc.txt', { type: 'text/plain' }))).toBe(false);
+    });
+
+    it('converts HEIC files to JPEG before adding them', async () => {
+      const jpeg = decodedJpeg();
+      spyOn(component as any, 'heicToJpeg').and.returnValue(Promise.resolve(jpeg));
+
+      component.onFilesSelected(selectionEvent([heicFile()]));
+      await wait(20);
+
+      expect((component as any).heicToJpeg).toHaveBeenCalled();
+      expect(component.selectedPhotos).toEqual([jpeg]);
+      expect(component.selectedPhotos[0].type).toBe('image/jpeg');
+      expect(component.selectedPhotos[0].name).toBe('IMG_0001.jpg');
+      expect(onChangeSpy).toHaveBeenCalledWith([jpeg]);
+    });
+
+    it('keeps the original file when the conversion fails', async () => {
+      const heic = heicFile();
+      spyOn(component as any, 'heicToJpeg').and.returnValue(
+        Promise.reject(new Error('decode failed'))
+      );
+
+      component.onFilesSelected(selectionEvent([heic]));
+      await wait(20);
+
+      expect(component.selectedPhotos).toEqual([heic]);
+      expect(onChangeSpy).toHaveBeenCalledWith([heic]);
+    });
+
+    it('does not load the decoder for regular images', () => {
+      const spy = spyOn(component as any, 'heicToJpeg').and.callThrough();
+      const png = imageFile('a.png');
+
+      component.onFilesSelected(selectionEvent([png]));
+
+      expect(spy).not.toHaveBeenCalled();
+      expect(component.selectedPhotos).toEqual([png]);
+    });
+
+    it('preserves the order of mixed batches', async () => {
+      const jpeg = decodedJpeg();
+      spyOn(component as any, 'heicToJpeg').and.returnValue(Promise.resolve(jpeg));
+      const png = imageFile('a.png');
+      const heic = heicFile();
+
+      component.onFilesSelected(selectionEvent([png, heic]));
+      await wait(20);
+
+      expect(component.selectedPhotos.length).toBe(2);
+      expect(component.selectedPhotos[0]).toBe(png);
+      expect(component.selectedPhotos[1]).toBe(jpeg);
+    });
+
+    it('converts HEIC before compressing when maxWidth is set', async () => {
+      component.maxWidth = 50;
+      const jpeg = decodedJpeg();
+      spyOn(component as any, 'heicToJpeg').and.returnValue(Promise.resolve(jpeg));
+      const compressSpy = spyOn(component as any, 'compressImage').and.callThrough();
+
+      component.onFilesSelected(selectionEvent([heicFile()]));
+      await wait(300);
+
+      expect(compressSpy).toHaveBeenCalledWith(jpeg);
+      expect(component.selectedPhotos.length).toBe(1);
+      expect(onChangeSpy).toHaveBeenCalled();
+    });
+
+    it('announces the conversion in the live region', async () => {
+      spyOn(component as any, 'heicToJpeg').and.returnValue(Promise.resolve(decodedJpeg()));
+
+      component.onFilesSelected(selectionEvent([heicFile()]));
+      await wait(20);
+
+      expect(component.announcement).toContain('HEIC convertido a JPEG');
+    });
+  });
+
   describe('paste from clipboard', () => {
     it('adds images pasted from the clipboard', () => {
       const file = imageFile('pasted.png');

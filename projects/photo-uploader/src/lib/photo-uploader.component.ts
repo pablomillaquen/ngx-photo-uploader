@@ -896,6 +896,56 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     });
   }
 
+  // ---------- HEIC/HEIF (fotos de iPhone) ----------
+
+  private static readonly HEIC_MIME = /^image\/(heic|heif)(-sequence)?$/;
+
+  /** Whether a file is a HEIC/HEIF image (by MIME type or extension — some OS report an empty type). */
+  private isHeicFile(file: File): boolean {
+    if (PhotoUploaderComponent.HEIC_MIME.test(file.type.toLowerCase())) {
+      return true;
+    }
+    const name = file.name.toLowerCase();
+    return name.endsWith('.heic') || name.endsWith('.heif');
+  }
+
+  /**
+   * Converts every HEIC/HEIF file of the batch to JPEG, keeping the original order.
+   * The decoder (`heic2any`) is lazy-loaded only when a HEIC file actually arrives,
+   * so regular batches never pay its cost. Files that fail to decode are kept as-is.
+   */
+  private async convertHeicFiles(files: File[]): Promise<{ files: File[]; converted: number }> {
+    const result = [...files];
+    let converted = 0;
+    for (let i = 0; i < files.length; i++) {
+      if (!this.isHeicFile(files[i])) {
+        continue;
+      }
+      try {
+        const jpeg = await this.heicToJpeg(files[i]);
+        if (jpeg) {
+          result[i] = jpeg;
+          converted++;
+        }
+      } catch {
+        // Decoder unavailable or corrupt file: keep the original file.
+      }
+    }
+    return { files: result, converted };
+  }
+
+  /** Decodes a HEIC/HEIF file and re-encodes it as JPEG at the configured quality. */
+  protected async heicToJpeg(file: File): Promise<File | null> {
+    const { default: heic2any } = await import('heic2any');
+    const output = await heic2any({ blob: file, toType: 'image/jpeg', quality: this.quality });
+    const blob = Array.isArray(output) ? output[0] : output;
+    if (!blob) {
+      return null;
+    }
+    const baseName = file.name.replace(/\.hei[cf]$/i, '');
+    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+  }
+
   private async processFiles(files: File[]): Promise<void> {
     let accepted: File[] = [];
     files.forEach((file) => {
@@ -915,16 +965,25 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
       accepted = accepted.slice(0, this.maxFiles);
     }
 
+    // HEIC/HEIF → JPEG. This only awaits when the batch contains HEIC files,
+    // so plain image batches keep their synchronous behaviour.
+    let heicConverted = 0;
+    if (accepted.some((file) => this.isHeicFile(file))) {
+      const conversion = await this.convertHeicFiles(accepted);
+      accepted = conversion.files;
+      heicConverted = conversion.converted;
+    }
+
     if (!this.isCompressionEnabled()) {
-      this.addPhotos(accepted);
+      this.addPhotos(accepted, heicConverted);
       return;
     }
 
     const processed = await this.compressImages(accepted);
-    this.ngZone.run(() => this.addPhotos(processed));
+    this.ngZone.run(() => this.addPhotos(processed, heicConverted));
   }
 
-  private addPhotos(files: File[]): void {
+  private addPhotos(files: File[], heicConverted = 0): void {
     let evicted = 0;
     if (this.maxFiles !== undefined) {
       const excess = this.selectedPhotos.length + files.length - this.maxFiles;
@@ -947,6 +1006,9 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
         : `Se añadieron ${files.length} fotos. Total: ${total} fotos`;
     if (evicted > 0) {
       message += `, ${evicted} ${evicted === 1 ? 'foto antigua eliminada' : 'fotos antiguas eliminadas'} por el límite de ${this.maxFiles}`;
+    }
+    if (heicConverted > 0) {
+      message += `, ${heicConverted} ${heicConverted === 1 ? 'HEIC convertido' : 'HEIC convertidos'} a JPEG`;
     }
     this.announce(message);
     files.forEach((_, i) => this.queueDimsLoad(startIndex + i));

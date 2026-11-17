@@ -10,6 +10,7 @@
 - Drag & drop with visual feedback
 - Paste images from the clipboard (Ctrl + V)
 - Camera capture (`getUserMedia`) — front/rear switch, pinch zoom + slider, flash (torch) when supported
+- **HEIC/HEIF support** (iPhone photos) — converted to JPEG, decoder lazy-loaded
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
 - EXIF orientation correction (rotated phone photos display correctly)
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
@@ -23,7 +24,7 @@
 - Visual invalid state (`NgControl`)
 - Reusable validators included
 - Configurable visual inputs
-- **No third-party dependencies** — only Angular packages required
+- **Minimal dependencies** — Angular packages plus `heic2any` (HEIC decoder), lazy-loaded only when a HEIC file arrives
 
 ## Requirements
 
@@ -119,6 +120,17 @@ The component includes a **"Use camera"** button to capture images directly from
 Press `Ctrl + V` (or `Cmd + V` on macOS) anywhere on the page to paste an image from the clipboard (e.g. screenshots). Pasted images are processed exactly like uploaded ones, so `maxFiles`, validators and compression all apply.
 
 > The paste is not intercepted when the focus is inside an `input` or `textarea`.
+
+## HEIC/HEIF
+
+Photos taken with an iPhone (and many Android phones) are saved as **HEIC/HEIF**, a format most back-ends and browsers cannot process. The component converts these files to **JPEG** automatically on selection:
+
+- Detection by MIME type (`image/heic`, `image/heif`, `image/*-sequence`) or by extension (`.heic` / `.heif`) when the OS reports an empty type
+- The file is renamed (`IMG_0001.HEIC` → `IMG_0001.jpg`) and re-encoded with the configured `quality`
+- Conversion runs **before** compression, so `maxWidth`, `maxHeight` and `quality` also apply to the result
+- The decoder (`heic2any`) is loaded **lazily**, only when a HEIC file actually arrives — regular batches never pay its cost
+- Files that fail to decode are kept as-is instead of being dropped
+- The number of converted files is announced in the ARIA live region
 
 ## Image compression
 
@@ -314,6 +326,7 @@ this.form = this.fb.group({
 - ✅ Cropping (aspect-ratio frames, pan/zoom, accessible dialog) with `enableCropping` + `cropAspect`
 - ✅ Content projection — custom placeholder and per-thumbnail actions via `ng-template`
 - ✅ `maxFiles` counter ("3/5") with auto-eviction of the oldest photos
+- ✅ HEIC/HEIF support (iPhone photos) — converted to JPEG, decoder lazy-loaded
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -336,7 +349,6 @@ _Complete — all visual items shipped._
 
 **4. Processing & API**
 
-- HEIC/HEIF support (iPhone photos)
 - Concurrent image compression with a concurrency limit
 - Web Worker for heavy re-encoding (non-blocking UI)
 - Per-image metadata output (`{ file, original, dimension, compressionRatio, error }`) and granular events (`photoAdded`, `photoRemoved`, `reordered`, `ready`)
