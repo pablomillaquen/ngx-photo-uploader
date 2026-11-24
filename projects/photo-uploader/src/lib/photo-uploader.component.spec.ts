@@ -570,6 +570,82 @@ describe('PhotoUploaderComponent', () => {
     });
   });
 
+  describe('concurrent compression', () => {
+    const trackConcurrency = () => {
+      const state = { inFlight: 0, maxInFlight: 0 };
+      const original = (component as any).compressImage.bind(component);
+      spyOn(component as any, 'compressImage').and.callFake((f: File) => {
+        state.inFlight++;
+        state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+        return original(f).finally(() => {
+          state.inFlight--;
+        });
+      });
+      return state;
+    };
+
+    it('defaults to 3 simultaneous tasks', () => {
+      expect(component.compressionConcurrency).toBe(3);
+    });
+
+    it('never exceeds the configured concurrency limit', async () => {
+      component.maxWidth = 50;
+      component.compressionConcurrency = 2;
+      const state = trackConcurrency();
+
+      const files = await Promise.all(
+        Array.from({ length: 5 }, (_, i) => makeImageFile(100, 80, 'image/png', `p${i}.png`))
+      );
+      component.onFilesSelected(selectionEvent(files));
+      await wait(600);
+
+      expect(component.selectedPhotos.length).toBe(5);
+      expect(state.maxInFlight).toBe(2);
+    });
+
+    it('falls back to a single task when the limit is invalid', async () => {
+      component.maxWidth = 50;
+      component.compressionConcurrency = 0;
+      const state = trackConcurrency();
+
+      const files = await Promise.all(
+        Array.from({ length: 3 }, (_, i) => makeImageFile(100, 80, 'image/png', `q${i}.png`))
+      );
+      component.onFilesSelected(selectionEvent(files));
+      await wait(600);
+
+      expect(component.selectedPhotos.length).toBe(3);
+      expect(state.maxInFlight).toBe(1);
+    });
+
+    it('preserves the batch order when tasks finish out of order', async () => {
+      component.maxWidth = 50;
+      component.compressionConcurrency = 3;
+      const files = await Promise.all([
+        makeImageFile(100, 80, 'image/png', 'a.png'),
+        makeImageFile(100, 80, 'image/png', 'b.png'),
+        makeImageFile(100, 80, 'image/png', 'c.png')
+      ]);
+      const delays = [60, 10, 30];
+      spyOn(component as any, 'compressImage').and.callFake(
+        (f: File) =>
+          new Promise<File>((resolve) => {
+            const delay = delays[files.indexOf(f)] ?? 0;
+            setTimeout(
+              () => resolve(new File([new Uint8Array(4)], f.name, { type: 'image/png' })),
+              delay
+            );
+          })
+      );
+
+      component.onFilesSelected(selectionEvent(files));
+      await wait(250);
+
+      expect(component.selectedPhotos.map((f) => f.name)).toEqual(['a.png', 'b.png', 'c.png']);
+      expect(onChangeSpy).toHaveBeenCalled();
+    });
+  });
+
   describe('paste from clipboard', () => {
     it('adds images pasted from the clipboard', () => {
       const file = imageFile('pasted.png');

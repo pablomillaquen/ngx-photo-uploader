@@ -12,6 +12,7 @@
 - Camera capture (`getUserMedia`) — front/rear switch, pinch zoom + slider, flash (torch) when supported
 - **HEIC/HEIF support** (iPhone photos) — converted to JPEG, decoder lazy-loaded
 - Image compression (`maxWidth`, `maxHeight`, `quality`)
+- Concurrent image compression with a configurable limit (`compressionConcurrency`, default 3)
 - EXIF orientation correction (rotated phone photos display correctly)
 - Reorder thumbnails — drag & drop on desktop, long-press on touch
 - Responsive thumbnail grid — fluid, square thumbnails that adapt to any screen size
@@ -80,6 +81,7 @@ The control value is always `File[]`, ready for `FormData`, REST APIs, or multip
 | `maxWidth`      | `number` | *unlimited*        | Max width in px (keeps aspect ratio) |
 | `maxHeight`     | `number` | *unlimited*        | Max height in px (keeps aspect ratio) |
 | `quality`       | `number` | `0.9`              | JPEG/WebP compression quality (0-1) |
+| `compressionConcurrency` | `number` | `3` | Max images compressed simultaneously (min 1) |
 | `height`        | `string` | `200px`            | Container height            |
 | `thumbnailSize` | `number` | `100`              | Thumbnail size (px)         |
 | `gap`           | `number` | `10`               | Space between thumbnails (px) |
@@ -148,6 +150,7 @@ Set `maxWidth` and/or `maxHeight` to automatically scale down images **before** 
 - Only JPEG, PNG and WebP images are compressed; GIF and SVG are kept as-is.
 - Images already within the limits are left untouched (no re-encoding).
 - Compression also applies to camera captures and pasted images.
+- Images are compressed **concurrently**: at most `compressionConcurrency` tasks run in parallel (default `3`) while the original batch order is always preserved. Set it to `1` for fully sequential processing.
 
 ## EXIF orientation
 
@@ -327,6 +330,7 @@ this.form = this.fb.group({
 - ✅ Content projection — custom placeholder and per-thumbnail actions via `ng-template`
 - ✅ `maxFiles` counter ("3/5") with auto-eviction of the oldest photos
 - ✅ HEIC/HEIF support (iPhone photos) — converted to JPEG, decoder lazy-loaded
+- ✅ Concurrent image compression with a concurrency limit (`compressionConcurrency`)
 
 **1. Mobile support — highest priority** (an operator using an app from a phone with fingers only)
 
@@ -349,7 +353,6 @@ _Complete — all visual items shipped._
 
 **4. Processing & API**
 
-- Concurrent image compression with a concurrency limit
 - Web Worker for heavy re-encoding (non-blocking UI)
 - Per-image metadata output (`{ file, original, dimension, compressionRatio, error }`) and granular events (`photoAdded`, `photoRemoved`, `reordered`, `ready`)
 - Per-format quality settings (`jpgQuality`, `pngCompression`) instead of a single `quality`

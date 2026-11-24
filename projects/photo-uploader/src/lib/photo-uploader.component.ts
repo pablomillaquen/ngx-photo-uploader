@@ -62,6 +62,8 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
   @Input() maxWidth?: number;
   @Input() maxHeight?: number;
   @Input() quality = 0.9;
+  /** Maximum number of images compressed simultaneously (values below 1 are treated as 1). */
+  @Input() compressionConcurrency = 3;
 
   @Input() height = '200px';
   @Input() thumbnailSize = 100;
@@ -1033,11 +1035,27 @@ export class PhotoUploaderComponent implements ControlValueAccessor, OnDestroy {
     return this.maxWidth != null || this.maxHeight != null;
   }
 
+  /**
+   * Compresses the batch running at most `compressionConcurrency` tasks in parallel.
+   * Results are stored by index, so the original order is always preserved no matter
+   * which task finishes first. Values below 1 (or non-finite) fall back to 1.
+   */
   private async compressImages(files: File[]): Promise<File[]> {
-    const result: File[] = [];
-    for (const file of files) {
-      result.push(await this.compressImage(file));
-    }
+    const limit = Number.isFinite(this.compressionConcurrency)
+      ? Math.max(1, Math.floor(this.compressionConcurrency))
+      : 1;
+    const result = new Array<File>(files.length);
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      while (nextIndex < files.length) {
+        // Single-threaded event loop: read + increment happen atomically.
+        const index = nextIndex++;
+        result[index] = await this.compressImage(files[index]);
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(limit, files.length) }, () => worker())
+    );
     return result;
   }
 
